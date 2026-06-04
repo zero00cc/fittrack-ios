@@ -7,11 +7,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useCalorieStore } from '../../hooks/useCalorieStore';
 import { foods, foodCategories } from '../../data/foods';
 import { buildMealEntry, calcDayTotal, getCalorieStatus, statusColor } from '../../utils/calorieUtils';
-import { FoodItem } from '../../types/calorie.types';
+import { FoodItem, MealEntry } from '../../types/calorie.types';
 import { isoToDisplay } from '../../utils/dateUtils';
+import { CalorieHistoryChart } from '../../components/calorie/CalorieHistoryChart';
+import { SnapTrack } from '../../components/calorie/SnapTrack';
 
 export default function CaloriesScreen() {
-  const { todayLog, settings, loaded, addEntry, removeEntry, setTarget } = useCalorieStore();
+  const { history, todayLog, settings, loaded, addEntry, removeEntry, setTarget } = useCalorieStore();
   const [foodModal, setFoodModal] = useState(false);
   const [targetModal, setTargetModal] = useState(false);
   const [selectedFood, setSelectedFood] = useState<FoodItem | null>(null);
@@ -72,6 +74,12 @@ export default function CaloriesScreen() {
           </View>
           <Text style={[styles.pctLabel, { color }]}>{pct}% of target</Text>
         </View>
+
+        {/* 30-day history chart */}
+        <CalorieHistoryChart history={history} target={settings.dailyTarget} />
+
+        {/* Photo analysis */}
+        <SnapTrack onAddEntries={(entries: MealEntry[]) => entries.forEach(addEntry)} />
 
         {/* Add meal button */}
         <TouchableOpacity style={styles.addBtn} onPress={() => setFoodModal(true)}>
