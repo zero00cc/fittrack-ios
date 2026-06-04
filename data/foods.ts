@@ -1,0 +1,36 @@
+import { FoodItem } from '../types/calorie.types';
+
+export const foods: FoodItem[] = [
+  { id: 'f01', name: 'Chicken Breast (grilled)', caloriesPer100g: 165, category: 'protein' },
+  { id: 'f02', name: 'Salmon (baked)', caloriesPer100g: 208, category: 'protein' },
+  { id: 'f03', name: 'Egg (whole)', caloriesPer100g: 155, category: 'protein' },
+  { id: 'f04', name: 'Ground Beef (lean)', caloriesPer100g: 215, category: 'protein' },
+  { id: 'f05', name: 'Tuna (canned in water)', caloriesPer100g: 116, category: 'protein' },
+  { id: 'f06', name: 'Tofu (firm)', caloriesPer100g: 76, category: 'protein' },
+  { id: 'f07', name: 'Greek Yogurt (full-fat)', caloriesPer100g: 97, category: 'dairy' },
+  { id: 'f08', name: 'Cottage Cheese', caloriesPer100g: 98, category: 'dairy' },
+  { id: 'f09', name: 'Cheddar Cheese', caloriesPer100g: 402, category: 'dairy' },
+  { id: 'f10', name: 'Whole Milk', caloriesPer100g: 61, category: 'dairy' },
+  { id: 'f11', name: 'White Rice (cooked)', caloriesPer100g: 130, category: 'carb' },
+  { id: 'f12', name: 'Brown Rice (cooked)', caloriesPer100g: 123, category: 'carb' },
+  { id: 'f13', name: 'Oats (dry)', caloriesPer100g: 389, category: 'carb' },
+  { id: 'f14', name: 'Whole Wheat Bread', caloriesPer100g: 247, category: 'carb' },
+  { id: 'f15', name: 'Pasta (cooked)', caloriesPer100g: 158, category: 'carb' },
+  { id: 'f16', name: 'Sweet Potato (baked)', caloriesPer100g: 90, category: 'carb' },
+  { id: 'f17', name: 'Banana', caloriesPer100g: 89, category: 'fruit' },
+  { id: 'f18', name: 'Apple', caloriesPer100g: 52, category: 'fruit' },
+  { id: 'f19', name: 'Blueberries', caloriesPer100g: 57, category: 'fruit' },
+  { id: 'f20', name: 'Orange', caloriesPer100g: 47, category: 'fruit' },
+  { id: 'f21', name: 'Avocado', caloriesPer100g: 160, category: 'fat' },
+  { id: 'f22', name: 'Olive Oil', caloriesPer100g: 884, category: 'fat' },
+  { id: 'f23', name: 'Almonds', caloriesPer100g: 579, category: 'fat' },
+  { id: 'f24', name: 'Peanut Butter', caloriesPer100g: 588, category: 'fat' },
+  { id: 'f25', name: 'Broccoli', caloriesPer100g: 34, category: 'vegetable' },
+  { id: 'f26', name: 'Spinach', caloriesPer100g: 23, category: 'vegetable' },
+  { id: 'f27', name: 'Carrot', caloriesPer100g: 41, category: 'vegetable' },
+  { id: 'f28', name: 'Bell Pepper', caloriesPer100g: 31, category: 'vegetable' },
+  { id: 'f29', name: 'Lentils (cooked)', caloriesPer100g: 116, category: 'other' },
+  { id: 'f30', name: 'Black Beans (cooked)', caloriesPer100g: 132, category: 'other' },
+];
+
+export const foodCategories = ['protein', 'dairy', 'carb', 'fruit', 'fat', 'vegetable', 'other'] as const;
