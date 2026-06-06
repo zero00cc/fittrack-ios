@@ -14,14 +14,14 @@ interface AuthContextValue {
   session:  Session | null;
   user:     User | null;
   loading:  boolean;
-  signUp:   (email: string, password: string) => Promise<{ error: string | null }>;
+  signUp:   (email: string, password: string) => Promise<{ error: string | null; needsConfirmation: boolean }>;
   signIn:   (email: string, password: string) => Promise<{ error: string | null }>;
   signOut:  () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue>({
   session: null, user: null, loading: true,
-  signUp: async () => ({ error: null }),
+  signUp: async () => ({ error: null, needsConfirmation: false }),
   signIn: async () => ({ error: null }),
   signOut: async () => {},
 });
@@ -46,8 +46,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   async function signUp(email: string, password: string) {
-    const { error } = await supabase.auth.signUp({ email, password });
-    return { error: error?.message ?? null };
+    const { data, error } = await supabase.auth.signUp({ email, password });
+    if (error) return { error: error.message, needsConfirmation: false };
+    // session is null when the Supabase project requires email confirmation
+    return { error: null, needsConfirmation: data.session === null };
   }
 
   async function signIn(email: string, password: string) {

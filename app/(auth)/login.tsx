@@ -8,7 +8,7 @@ import { useAuth } from '../../context/AuthContext';
 
 export default function LoginScreen() {
   const { signIn, signUp } = useAuth();
-  const [mode, setMode]       = useState<'login' | 'register'>('login');
+  const [mode, setMode]       = useState<'login' | 'register' | 'confirm'>('login');
   const [email, setEmail]     = useState('');
   const [password, setPassword] = useState('');
   const [error, setError]     = useState('');
@@ -21,14 +21,48 @@ export default function LoginScreen() {
     }
     setLoading(true);
     setError('');
-    const fn = mode === 'login' ? signIn : signUp;
-    const { error: authError } = await fn(email.trim(), password);
-    setLoading(false);
-    if (authError) {
-      setError(authError);
+
+    if (mode === 'register') {
+      const { error: authError, needsConfirmation } = await signUp(email.trim(), password);
+      setLoading(false);
+      if (authError) {
+        setError(authError);
+      } else if (needsConfirmation) {
+        setMode('confirm');
+      } else {
+        router.replace('/(tabs)');
+      }
     } else {
-      router.replace('/(tabs)');
+      const { error: authError } = await signIn(email.trim(), password);
+      setLoading(false);
+      if (authError) {
+        setError(authError);
+      } else {
+        router.replace('/(tabs)');
+      }
     }
+  }
+
+  if (mode === 'confirm') {
+    return (
+      <KeyboardAvoidingView style={styles.safe} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <View style={styles.inner}>
+          <Text style={styles.logo}>✉️</Text>
+          <Text style={styles.title}>Check your email</Text>
+          <Text style={styles.subtitle}>
+            We sent a confirmation link to{'\n'}
+            <Text style={{ fontWeight: '700', color: '#111827' }}>{email}</Text>
+            {'\n\n'}Open the link to activate your account, then come back to sign in.
+          </Text>
+          <TouchableOpacity
+            style={styles.btn}
+            onPress={() => { setMode('login'); setError(''); }}
+          >
+            <Text style={styles.btnText}>Back to Sign In</Text>
+          </TouchableOpacity>
+        </View>
+      </KeyboardAvoidingView>
+    );
   }
 
   return (
@@ -96,7 +130,7 @@ const styles = StyleSheet.create({
   inner:      { flex: 1, justifyContent: 'center', padding: 28 },
   logo:       { fontSize: 56, textAlign: 'center', marginBottom: 8 },
   title:      { fontSize: 28, fontWeight: '800', color: '#111827', textAlign: 'center' },
-  subtitle:   { fontSize: 14, color: '#6b7280', textAlign: 'center', marginBottom: 32, marginTop: 4 },
+  subtitle:   { fontSize: 14, color: '#6b7280', textAlign: 'center', marginBottom: 32, marginTop: 4, lineHeight: 22 },
   input: {
     backgroundColor: '#fff',
     borderWidth: 1,
