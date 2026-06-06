@@ -13,33 +13,30 @@ type CellColor = 'green' | 'red' | 'orange' | 'upcoming' | null;
 
 interface Props {
   progress: PlanProgress;
-  // Plan dayNumbers for each training day in order (e.g. [1,2,4,5])
   trainingDayNumbers: number[];
   onPressDay: (dayNumber: number) => void;
 }
 
 export function WorkoutCalendar({ progress, trainingDayNumbers, onPressDay }: Props) {
   const today = todayYMD();
-  const todayParts = today.split('-').map(Number);
-  const [year, setYear] = useState(todayParts[0]);
-  const [month, setMonth] = useState(todayParts[1] - 1); // 0-indexed
+  const [year, setYear] = useState(() => parseInt(today.slice(0, 4)));
+  const [month, setMonth] = useState(() => parseInt(today.slice(5, 7)) - 1);
 
-  // Build the effective date→dayNumber map once
-  const effectiveDateMap = useMemo<{ [dateYMD: string]: number }>(() => {
+  const effectiveDateMap = useMemo<{ [date: string]: number }>(() => {
     if ((progress.mode ?? 'daily') === 'scheduled' && progress.dateMap) {
       return progress.dateMap;
     }
-    // daily: compute expected training dates from the plan schedule
-    const dates = getTrainingDates(progress.startDate, progress.weeklySchedule, trainingDayNumbers.length);
+    const dates = getTrainingDates(
+      progress.startDate,
+      progress.weeklySchedule,
+      trainingDayNumbers.length,
+    );
     const map: { [date: string]: number } = {};
-    dates.forEach((date, i) => {
-      if (i < trainingDayNumbers.length) map[date] = trainingDayNumbers[i];
-    });
+    dates.forEach((date, i) => { map[date] = trainingDayNumbers[i]; });
     return map;
   }, [progress.mode, progress.dateMap, progress.startDate, progress.weeklySchedule, trainingDayNumbers]);
 
-  // Invert completionDates to date→dayNumber for O(1) lookup
-  const completionDateMap = useMemo<{ [dateYMD: string]: number }>(() => {
+  const completionDateMap = useMemo<{ [date: string]: number }>(() => {
     const map: { [date: string]: number } = {};
     Object.entries(progress.completionDates ?? {}).forEach(([dn, date]) => {
       map[date] = parseInt(dn);
@@ -55,33 +52,35 @@ export function WorkoutCalendar({ progress, trainingDayNumbers, onPressDay }: Pr
       if (!dayNumber) return { dayNumber: null, color: null };
       const status = progress.dayStatus[dayNumber] ?? 'unfinished';
       if (status === 'finished') return { dayNumber, color: 'green' };
-      if (status === 'skipped') return { dayNumber, color: 'orange' };
-      if (dateYMD < today) return { dayNumber, color: 'red' };
+      if (status === 'skipped')  return { dayNumber, color: 'orange' };
+      if (dateYMD < today)       return { dayNumber, color: 'red' };
       return { dayNumber, color: 'upcoming' };
     }
 
-    // daily mode — actual completions take priority
+    // daily mode — actual completions first
     if (completionDateMap[dateYMD] !== undefined) {
       const dn = completionDateMap[dateYMD];
       const status = progress.dayStatus[dn] ?? 'finished';
       return { dayNumber: dn, color: status === 'skipped' ? 'orange' : 'green' };
     }
-
-    // expected dates for daily mode
     const dayNumber = effectiveDateMap[dateYMD];
     if (!dayNumber) return { dayNumber: null, color: null };
     if (dateYMD < today) return { dayNumber, color: 'red' };
     return { dayNumber, color: 'upcoming' };
   }
 
-  // Build calendar grid for current month
+  // Build rows of 7 cells
   const firstDow = new Date(year, month, 1).getDay();
   const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const cells: (number | null)[] = [
+  const flat: (number | null)[] = [
     ...Array(firstDow).fill(null),
     ...Array.from({ length: daysInMonth }, (_, i) => i + 1),
   ];
-  while (cells.length % 7 !== 0) cells.push(null);
+  while (flat.length % 7 !== 0) flat.push(null);
+  const rows: (number | null)[][] = [];
+  for (let i = 0; i < flat.length; i += 7) rows.push(flat.slice(i, i + 7));
+
+  const pad = (n: number) => String(n).padStart(2, '0');
 
   function prevMonth() {
     if (month === 0) { setYear((y) => y - 1); setMonth(11); }
@@ -92,68 +91,70 @@ export function WorkoutCalendar({ progress, trainingDayNumbers, onPressDay }: Pr
     else setMonth((m) => m + 1);
   }
 
-  const pad = (n: number) => String(n).padStart(2, '0');
-
   return (
     <View style={styles.container}>
       {/* Month navigation */}
       <View style={styles.nav}>
-        <TouchableOpacity onPress={prevMonth} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+        <TouchableOpacity onPress={prevMonth} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
           <Text style={styles.navArrow}>‹</Text>
         </TouchableOpacity>
         <Text style={styles.monthLabel}>{MONTHS[month]} {year}</Text>
-        <TouchableOpacity onPress={nextMonth} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+        <TouchableOpacity onPress={nextMonth} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
           <Text style={styles.navArrow}>›</Text>
         </TouchableOpacity>
       </View>
 
       {/* Day-of-week headers */}
-      <View style={styles.dowRow}>
+      <View style={styles.row}>
         {DOW.map((d) => (
-          <Text key={d} style={styles.dowLabel}>{d}</Text>
+          <View key={d} style={styles.cell}>
+            <Text style={styles.dowLabel}>{d}</Text>
+          </View>
         ))}
       </View>
 
-      {/* Date grid */}
-      <View style={styles.grid}>
-        {cells.map((day, idx) => {
-          if (!day) return <View key={`pad-${idx}`} style={styles.cell} />;
+      {/* Rows of dates */}
+      {rows.map((row, ri) => (
+        <View key={ri} style={styles.row}>
+          {row.map((day, ci) => {
+            if (!day) return <View key={ci} style={styles.cell} />;
 
-          const dateYMD = `${year}-${pad(month + 1)}-${pad(day)}`;
-          const isToday = dateYMD === today;
-          const { dayNumber, color } = getCellInfo(dateYMD);
+            const dateYMD = `${year}-${pad(month + 1)}-${pad(day)}`;
+            const isToday = dateYMD === today;
+            const { dayNumber, color } = getCellInfo(dateYMD);
 
-          const bgColor =
-            color === 'green' ? '#10b981'
-            : color === 'red' ? '#ef4444'
-            : color === 'orange' ? '#f59e0b'
-            : 'transparent';
+            const bgColor =
+              color === 'green'  ? '#10b981' :
+              color === 'red'    ? '#ef4444' :
+              color === 'orange' ? '#f59e0b' :
+              'transparent';
 
-          const textColor =
-            color === 'green' || color === 'red' || color === 'orange' ? '#fff'
-            : isToday ? '#6366f1'
-            : '#374151';
+            const textColor =
+              (color === 'green' || color === 'red' || color === 'orange') ? '#fff' :
+              isToday ? '#6366f1' :
+              '#374151';
 
-          return (
-            <TouchableOpacity
-              key={dateYMD}
-              style={styles.cell}
-              onPress={() => dayNumber !== null && onPressDay(dayNumber)}
-              disabled={dayNumber === null}
-              activeOpacity={dayNumber !== null ? 0.7 : 1}
-            >
-              <View style={[
-                styles.circle,
-                { backgroundColor: bgColor },
-                color === 'upcoming' && styles.circleUpcoming,
-                isToday && color === null && styles.circleToday,
-              ]}>
-                <Text style={[styles.dayNum, { color: textColor }]}>{day}</Text>
-              </View>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
+            return (
+              <TouchableOpacity
+                key={dateYMD}
+                style={styles.cell}
+                onPress={() => { if (dayNumber !== null) onPressDay(dayNumber); }}
+                disabled={dayNumber === null}
+                activeOpacity={0.65}
+              >
+                <View style={[
+                  styles.circle,
+                  { backgroundColor: bgColor },
+                  color === 'upcoming' && styles.circleUpcoming,
+                  isToday && color === null && styles.circleToday,
+                ]}>
+                  <Text style={[styles.dayNum, { color: textColor }]}>{day}</Text>
+                </View>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      ))}
 
       {/* Legend */}
       <View style={styles.legend}>
@@ -173,7 +174,8 @@ export function WorkoutCalendar({ progress, trainingDayNumbers, onPressDay }: Pr
   );
 }
 
-const CIRCLE = 36;
+const CIRCLE = 34;
+const CELL_H = 42;
 
 const styles = StyleSheet.create({
   container: {
@@ -194,16 +196,14 @@ const styles = StyleSheet.create({
   },
   navArrow: { fontSize: 24, fontWeight: '600', color: '#374151', lineHeight: 28 },
   monthLabel: { fontSize: 15, fontWeight: '700', color: '#111827' },
-  dowRow: { flexDirection: 'row', marginBottom: 2 },
-  dowLabel: { flex: 1, textAlign: 'center', fontSize: 11, fontWeight: '600', color: '#9ca3af' },
-  grid: { flexDirection: 'row', flexWrap: 'wrap' },
+  row: { flexDirection: 'row' },
   cell: {
-    width: `${100 / 7}%` as any,
-    aspectRatio: 1,
+    flex: 1,
+    height: CELL_H,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 2,
   },
+  dowLabel: { fontSize: 11, fontWeight: '600', color: '#9ca3af' },
   circle: {
     width: CIRCLE,
     height: CIRCLE,
@@ -211,14 +211,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  circleUpcoming: {
-    borderWidth: 1.5,
-    borderColor: '#93c5fd',
-  },
-  circleToday: {
-    borderWidth: 2,
-    borderColor: '#6366f1',
-  },
+  circleUpcoming: { borderWidth: 1.5, borderColor: '#93c5fd' },
+  circleToday:    { borderWidth: 2,   borderColor: '#6366f1' },
   dayNum: { fontSize: 13, fontWeight: '600' },
   legend: {
     flexDirection: 'row',
@@ -229,6 +223,6 @@ const styles = StyleSheet.create({
     borderTopColor: '#f3f4f6',
   },
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  legendDot: { width: 8, height: 8, borderRadius: 4 },
+  legendDot:  { width: 8, height: 8, borderRadius: 4 },
   legendLabel: { fontSize: 10, color: '#6b7280' },
 });

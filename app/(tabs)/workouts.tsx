@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Modal, StyleSheet, Alert, TextInput } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Modal, StyleSheet, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useWorkoutStore } from '../../hooks/useWorkoutStore';
 import { workoutPlans } from '../../data/workoutPlans';
@@ -68,6 +68,7 @@ export default function WorkoutsScreen() {
   const [pickerSearch, setPickerSearch] = useState('');
   const [pendingPlanId, setPendingPlanId] = useState<string | null>(null);
   const [showModePicker, setShowModePicker] = useState(false);
+  const [confirmReset, setConfirmReset] = useState(false);
 
   // These must stay above any early return to satisfy Rules of Hooks
   const dayExerciseIds = useMemo(() => {
@@ -120,6 +121,11 @@ export default function WorkoutsScreen() {
   }
 
   function handleSelectPlan(planId: string) {
+    // Plan already active — go straight to detail without re-asking mode
+    if (workoutState.activePlanId === planId && workoutState.progress) {
+      setView('detail');
+      return;
+    }
     setPendingPlanId(planId);
     setShowModePicker(true);
   }
@@ -146,10 +152,13 @@ export default function WorkoutsScreen() {
   }
 
   function handleReset() {
-    Alert.alert('Reset Plan?', 'Your progress will be cleared.', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Reset', style: 'destructive', onPress: () => { resetPlan(); setView('plans'); } },
-    ]);
+    setConfirmReset(true);
+  }
+
+  function doReset() {
+    setConfirmReset(false);
+    resetPlan();
+    setView('level');
   }
 
   function handleDayBlockUpdate(dayNumber: number, exerciseId: string, blockIndex: number, newCount: number) {
@@ -247,9 +256,20 @@ export default function WorkoutsScreen() {
                 <Text style={styles.planName}>{activePlan.name}</Text>
                 <Text style={styles.planDesc} numberOfLines={2}>{activePlan.description}</Text>
               </View>
-              <TouchableOpacity onPress={handleReset} style={styles.resetBtn}>
-                <Text style={styles.resetBtnText}>Reset</Text>
-              </TouchableOpacity>
+              {confirmReset ? (
+                <View style={styles.confirmRow}>
+                  <TouchableOpacity onPress={() => setConfirmReset(false)} style={styles.confirmCancelBtn}>
+                    <Text style={styles.confirmCancelText}>No</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={doReset} style={styles.confirmResetBtn}>
+                    <Text style={styles.confirmResetText}>Yes, Reset</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <TouchableOpacity onPress={handleReset} style={styles.resetBtn}>
+                  <Text style={styles.resetBtnText}>Reset</Text>
+                </TouchableOpacity>
+              )}
             </View>
 
             {workoutState.progress && (
@@ -420,6 +440,11 @@ const styles = StyleSheet.create({
   planWeeksLabel: { fontSize: 11, color: '#9ca3af' },
   resetBtn: { backgroundColor: '#fee2e2', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6 },
   resetBtnText: { color: '#ef4444', fontSize: 12, fontWeight: '700' },
+  confirmRow: { flexDirection: 'row', gap: 6, alignItems: 'center' },
+  confirmCancelBtn: { backgroundColor: '#f3f4f6', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 },
+  confirmCancelText: { color: '#6b7280', fontSize: 12, fontWeight: '600' },
+  confirmResetBtn: { backgroundColor: '#ef4444', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 },
+  confirmResetText: { color: '#fff', fontSize: 12, fontWeight: '700' },
   sectionTitle: { fontSize: 14, fontWeight: '700', color: '#111827' },
   dayRow: { backgroundColor: '#fff', borderRadius: 12, padding: 14, flexDirection: 'row', alignItems: 'center', shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 4, shadowOffset: { width: 0, height: 1 } },
   dayLabel: { fontSize: 13, fontWeight: '600', color: '#111827' },
