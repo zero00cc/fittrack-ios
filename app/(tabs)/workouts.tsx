@@ -7,6 +7,7 @@ import { exercises as libraryExercises } from '../../data/exercises';
 import { ExerciseCard } from '../../components/workout/ExerciseCard';
 import { ModePicker } from '../../components/workout/ModePicker';
 import { WorkoutCalendar } from '../../components/workout/WorkoutCalendar';
+import { ScheduleSetup } from '../../components/workout/ScheduleSetup';
 import {
   TrainingLevel,
   WorkoutDay,
@@ -15,7 +16,6 @@ import {
   SetBlock,
   PlanMode,
 } from '../../types/workout.types';
-import { todayYMD, getTrainingDates } from '../../utils/dateUtils';
 
 const LEVELS: Array<{ id: TrainingLevel; label: string; icon: string; desc: string; color: string; border: string }> = [
   { id: 'beginner', label: 'Beginner', icon: '🌱', desc: 'New to weight training. Plans focused on building a movement foundation.', color: '#f0fdf4', border: '#4ade80' },
@@ -62,7 +62,7 @@ export default function WorkoutsScreen() {
     resetPlan,
   } = useWorkoutStore();
 
-  const [view, setView] = useState<'level' | 'plans' | 'detail'>('level');
+  const [view, setView] = useState<'level' | 'plans' | 'setup' | 'detail'>('level');
   const [selectedDay, setSelectedDay] = useState<WorkoutDay | null>(null);
   const [showPicker, setShowPicker] = useState(false);
   const [pickerSearch, setPickerSearch] = useState('');
@@ -135,18 +135,16 @@ export default function WorkoutsScreen() {
     const plan = workoutPlans.find((p) => p.id === pendingPlanId);
     if (!plan) return;
 
-    const schedule = plan.defaultWeeklySchedule;
-    let dateMap: { [dateYMD: string]: number } | undefined;
+    setShowModePicker(false);
 
     if (mode === 'scheduled') {
-      const trainingDayNums = plan.days.filter((d) => !d.isRestDay).map((d) => d.dayNumber);
-      const dates = getTrainingDates(todayYMD(), schedule, trainingDayNums.length);
-      dateMap = {};
-      dates.forEach((date, i) => { dateMap![date] = trainingDayNums[i]; });
+      // Go to the manual scheduling screen (pendingPlanId stays set)
+      setView('setup');
+      return;
     }
 
-    activatePlan(pendingPlanId, schedule, mode, dateMap);
-    setShowModePicker(false);
+    // daily: activate immediately with no pre-assigned dates
+    activatePlan(pendingPlanId, plan.defaultWeeklySchedule, 'daily', undefined);
     setPendingPlanId(null);
     setView('detail');
   }
@@ -239,6 +237,26 @@ export default function WorkoutsScreen() {
           onCancel={() => { setShowModePicker(false); setPendingPlanId(null); }}
         />
       </SafeAreaView>
+    );
+  }
+
+  // ── Manual schedule setup ───────────────────────────────────────
+  if (view === 'setup') {
+    const plan = pendingPlanId ? workoutPlans.find((p) => p.id === pendingPlanId) : null;
+    if (!plan) { setView('plans'); return null; }
+    return (
+      <ScheduleSetup
+        plan={plan}
+        onConfirm={(dateMap) => {
+          activatePlan(pendingPlanId!, plan.defaultWeeklySchedule, 'scheduled', dateMap);
+          setPendingPlanId(null);
+          setView('detail');
+        }}
+        onCancel={() => {
+          setPendingPlanId(null);
+          setView('plans');
+        }}
+      />
     );
   }
 

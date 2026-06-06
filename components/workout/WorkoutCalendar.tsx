@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { PlanProgress } from '../../types/workout.types';
-import { todayYMD, getTrainingDates } from '../../utils/dateUtils';
+import { todayYMD } from '../../utils/dateUtils';
 
 const DOW = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
 const MONTHS = [
@@ -23,18 +23,13 @@ export function WorkoutCalendar({ progress, trainingDayNumbers, onPressDay }: Pr
   const [month, setMonth] = useState(() => parseInt(today.slice(5, 7)) - 1);
 
   const effectiveDateMap = useMemo<{ [date: string]: number }>(() => {
+    // scheduled mode: use the pre-built dateMap from plan activation
     if ((progress.mode ?? 'daily') === 'scheduled' && progress.dateMap) {
       return progress.dateMap;
     }
-    const dates = getTrainingDates(
-      progress.startDate,
-      progress.weeklySchedule,
-      trainingDayNumbers.length,
-    );
-    const map: { [date: string]: number } = {};
-    dates.forEach((date, i) => { map[date] = trainingDayNumbers[i]; });
-    return map;
-  }, [progress.mode, progress.dateMap, progress.startDate, progress.weeklySchedule, trainingDayNumbers]);
+    // daily mode: no pre-assigned dates — calendar only fills in as workouts are logged
+    return {};
+  }, [progress.mode, progress.dateMap]);
 
   const completionDateMap = useMemo<{ [date: string]: number }>(() => {
     const map: { [date: string]: number } = {};
