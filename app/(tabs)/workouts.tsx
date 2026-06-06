@@ -260,6 +260,33 @@ export default function WorkoutsScreen() {
               </View>
             </TouchableOpacity>
           ))}
+
+          {(workoutState.planHistory ?? []).length > 0 && (
+            <View style={styles.historyBox}>
+              <Text style={styles.historyBoxTitle}>Completed Plans</Text>
+              {workoutState.planHistory.map((record) => (
+                <TouchableOpacity
+                  key={record.id}
+                  style={styles.historyBoxRow}
+                  onPress={() => setView('history')}
+                  activeOpacity={0.7}
+                >
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.historyBoxPlanName}>{record.planName}</Text>
+                    <Text style={styles.historyBoxDates}>
+                      {isoToDisplay(record.startDate)} → {isoToDisplay(record.completedDate)}
+                    </Text>
+                  </View>
+                  <View style={styles.historyBoxBadge}>
+                    <Text style={styles.historyBoxBadgeText}>
+                      {record.finishedDays}/{record.totalDays}
+                    </Text>
+                    <Text style={styles.historyBoxBadgeLabel}>done</Text>
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
         </ScrollView>
       </SafeAreaView>
     );
@@ -295,32 +322,6 @@ export default function WorkoutsScreen() {
             ))
           )}
 
-          {(workoutState.planHistory ?? []).length > 0 && (
-            <View style={styles.historyBox}>
-              <Text style={styles.historyBoxTitle}>Completed Plans</Text>
-              {workoutState.planHistory.map((record) => (
-                <TouchableOpacity
-                  key={record.id}
-                  style={styles.historyBoxRow}
-                  onPress={() => setView('history')}
-                  activeOpacity={0.7}
-                >
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.historyBoxPlanName}>{record.planName}</Text>
-                    <Text style={styles.historyBoxDates}>
-                      {isoToDisplay(record.startDate)} → {isoToDisplay(record.completedDate)}
-                    </Text>
-                  </View>
-                  <View style={styles.historyBoxBadge}>
-                    <Text style={styles.historyBoxBadgeText}>
-                      {record.finishedDays}/{record.totalDays}
-                    </Text>
-                    <Text style={styles.historyBoxBadgeLabel}>done</Text>
-                  </View>
-                </TouchableOpacity>
-              ))}
-            </View>
-          )}
         </ScrollView>
 
         <ModePicker
@@ -359,7 +360,7 @@ export default function WorkoutsScreen() {
     return (
       <SafeAreaView style={styles.safe} edges={['bottom']}>
         <ScrollView contentContainerStyle={styles.scroll}>
-          <TouchableOpacity onPress={() => setView('detail')} style={styles.backBtn}>
+          <TouchableOpacity onPress={() => setView('level')} style={styles.backBtn}>
             <Text style={styles.backBtnText}>← Back</Text>
           </TouchableOpacity>
           <Text style={styles.pageTitle}>Completed Plans</Text>
