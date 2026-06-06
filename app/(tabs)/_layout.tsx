@@ -57,6 +57,14 @@ export default function TabLayout() {
           tabBarIcon: ({ focused }) => <Icon label="📸" focused={focused} />,
         }}
       />
+      <Tabs.Screen
+        name="ranking"
+        options={{
+          title: 'Leaderboard',
+          tabBarLabel: 'Ranking',
+          tabBarIcon: ({ focused }) => <Icon label="🏆" focused={focused} />,
+        }}
+      />
     </Tabs>
   );
 }

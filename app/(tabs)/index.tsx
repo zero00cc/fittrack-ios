@@ -2,17 +2,21 @@ import { ScrollView, View, Text, TouchableOpacity, StyleSheet } from 'react-nati
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
+import { useWorkoutStore } from '../../hooks/useWorkoutStore';
 
 const features = [
-  { route: '/calories', icon: '🥗', label: 'Calorie Tracker', desc: 'Log meals and track daily intake.', color: '#d1fae5', border: '#6ee7b7' },
-  { route: '/workouts', icon: '🏋️', label: 'Workout Plans', desc: 'Follow structured training plans.', color: '#dbeafe', border: '#93c5fd' },
-  { route: '/exercises', icon: '🎬', label: 'Exercise Library', desc: 'Video demos and step-by-step guidance.', color: '#ede9fe', border: '#c4b5fd' },
-  { route: '/gallery', icon: '📸', label: 'Gallery', desc: 'Photos of your meals and workouts.', color: '#ffedd5', border: '#fdba74' },
+  { route: '/calories',  icon: '🥗', label: 'Calorie Tracker',   desc: 'Log meals and track daily intake.',          color: '#d1fae5', border: '#6ee7b7' },
+  { route: '/workouts',  icon: '🏋️', label: 'Workout Plans',     desc: 'Follow structured training plans.',          color: '#dbeafe', border: '#93c5fd' },
+  { route: '/exercises', icon: '🎬', label: 'Exercise Library',   desc: 'Video demos and step-by-step guidance.',    color: '#ede9fe', border: '#c4b5fd' },
+  { route: '/gallery',   icon: '📸', label: 'Gallery',            desc: 'Photos of your meals and workouts.',        color: '#ffedd5', border: '#fdba74' },
 ] as const;
 
 export default function HomeScreen() {
   const router = useRouter();
   const { user, signOut } = useAuth();
+  const { workoutState } = useWorkoutStore();
+
+  const rankingUnlocked = (workoutState.planHistory ?? []).length > 0;
 
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
@@ -22,6 +26,7 @@ export default function HomeScreen() {
           <Text style={styles.heroSub}>Track your nutrition and train with purpose.</Text>
           {user && <Text style={styles.userEmail}>{user.email}</Text>}
         </View>
+
         <View style={styles.grid}>
           {features.map((f) => (
             <TouchableOpacity
@@ -37,6 +42,28 @@ export default function HomeScreen() {
           ))}
         </View>
 
+        {/* Ranking card — full width, unlocks after first completed plan */}
+        <TouchableOpacity
+          style={[styles.rankingCard, !rankingUnlocked && styles.rankingCardLocked]}
+          onPress={() => router.push('/ranking' as any)}
+          activeOpacity={rankingUnlocked ? 0.8 : 0.6}
+        >
+          <View style={styles.rankingLeft}>
+            <Text style={styles.rankingIcon}>{rankingUnlocked ? '🏆' : '🔒'}</Text>
+            <View>
+              <Text style={[styles.rankingLabel, !rankingUnlocked && styles.rankingLabelLocked]}>
+                Global Ranking
+              </Text>
+              <Text style={[styles.rankingDesc, !rankingUnlocked && styles.rankingDescLocked]}>
+                {rankingUnlocked
+                  ? 'See how your squat, bench & deadlift stack up worldwide.'
+                  : 'Complete a workout plan to unlock the leaderboard.'}
+              </Text>
+            </View>
+          </View>
+          <Text style={[styles.rankingChevron, !rankingUnlocked && { opacity: 0.3 }]}>›</Text>
+        </TouchableOpacity>
+
         <TouchableOpacity style={styles.signOutBtn} onPress={signOut} activeOpacity={0.8}>
           <Text style={styles.signOutText}>Sign Out</Text>
         </TouchableOpacity>
@@ -46,20 +73,36 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#f9fafb' },
-  scroll: { padding: 16, gap: 16 },
-  hero: { alignItems: 'center', paddingVertical: 24 },
-  heroTitle: { fontSize: 26, fontWeight: '800', color: '#111827', textAlign: 'center' },
-  heroSub: { fontSize: 15, color: '#6b7280', marginTop: 6, textAlign: 'center' },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+  safe:                { flex: 1, backgroundColor: '#f9fafb' },
+  scroll:              { padding: 16, gap: 16 },
+  hero:                { alignItems: 'center', paddingVertical: 24 },
+  heroTitle:           { fontSize: 26, fontWeight: '800', color: '#111827', textAlign: 'center' },
+  heroSub:             { fontSize: 15, color: '#6b7280', marginTop: 6, textAlign: 'center' },
+  grid:                { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   card: {
     width: '47%', borderRadius: 16, borderWidth: 2, padding: 16,
     gap: 8, shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 8, shadowOffset: { width: 0, height: 2 },
   },
-  cardIcon: { fontSize: 32 },
-  cardLabel: { fontSize: 16, fontWeight: '700', color: '#111827' },
-  cardDesc:     { fontSize: 12, color: '#6b7280', lineHeight: 17 },
-  userEmail:    { fontSize: 12, color: '#9ca3af', marginTop: 6 },
-  signOutBtn:   { marginTop: 8, alignItems: 'center', paddingVertical: 14, backgroundColor: '#fee2e2', borderRadius: 12 },
-  signOutText:  { color: '#ef4444', fontWeight: '700', fontSize: 14 },
+  cardIcon:            { fontSize: 32 },
+  cardLabel:           { fontSize: 16, fontWeight: '700', color: '#111827' },
+  cardDesc:            { fontSize: 12, color: '#6b7280', lineHeight: 17 },
+  userEmail:           { fontSize: 12, color: '#9ca3af', marginTop: 6 },
+  // Ranking card
+  rankingCard: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: '#fefce8', borderWidth: 2, borderColor: '#fde68a',
+    borderRadius: 16, padding: 16, gap: 12,
+    shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 8, shadowOffset: { width: 0, height: 2 },
+  },
+  rankingCardLocked:   { backgroundColor: '#f3f4f6', borderColor: '#e5e7eb' },
+  rankingLeft:         { flexDirection: 'row', alignItems: 'center', flex: 1, gap: 12 },
+  rankingIcon:         { fontSize: 32 },
+  rankingLabel:        { fontSize: 16, fontWeight: '700', color: '#111827' },
+  rankingLabelLocked:  { color: '#9ca3af' },
+  rankingDesc:         { fontSize: 12, color: '#92400e', lineHeight: 17, marginTop: 2 },
+  rankingDescLocked:   { color: '#9ca3af' },
+  rankingChevron:      { fontSize: 26, color: '#d97706', fontWeight: '300' },
+  // Sign out
+  signOutBtn:          { marginTop: 8, alignItems: 'center', paddingVertical: 14, backgroundColor: '#fee2e2', borderRadius: 12 },
+  signOutText:         { color: '#ef4444', fontWeight: '700', fontSize: 14 },
 });
