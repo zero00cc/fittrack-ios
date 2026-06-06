@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
 import { useAsyncStorage } from './useAsyncStorage';
-import { WorkoutState, TrainingLevel, DayStatus, SetBlock, Exercise } from '../types/workout.types';
+import { WorkoutState, TrainingLevel, DayStatus, SetBlock, Exercise, PlanMode } from '../types/workout.types';
 import { todayYMD } from '../utils/dateUtils';
 
 const WORKOUT_KEY = 'fittrack_workout_state';
@@ -24,11 +24,11 @@ export function useWorkoutStore() {
   );
 
   const activatePlan = useCallback(
-    (planId: string, weeklySchedule: number[]) =>
+    (planId: string, weeklySchedule: number[], mode: PlanMode, dateMap?: { [dateYMD: string]: number }) =>
       setWorkoutState((prev) => ({
         ...prev,
         activePlanId: planId,
-        progress: { planId, startDate: todayYMD(), dayStatus: {}, weeklySchedule },
+        progress: { planId, startDate: todayYMD(), mode, dayStatus: {}, weeklySchedule, dateMap },
       })),
     [setWorkoutState],
   );
@@ -37,11 +37,18 @@ export function useWorkoutStore() {
     (dayNumber: number, status: DayStatus) =>
       setWorkoutState((prev) => {
         if (!prev.progress) return prev;
+        const completionDates = { ...(prev.progress.completionDates ?? {}) };
+        if (status === 'finished') {
+          completionDates[dayNumber] = todayYMD();
+        } else {
+          delete completionDates[dayNumber];
+        }
         return {
           ...prev,
           progress: {
             ...prev.progress,
             dayStatus: { ...prev.progress.dayStatus, [dayNumber]: status },
+            completionDates,
           },
         };
       }),

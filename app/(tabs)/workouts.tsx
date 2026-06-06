@@ -5,13 +5,17 @@ import { useWorkoutStore } from '../../hooks/useWorkoutStore';
 import { workoutPlans } from '../../data/workoutPlans';
 import { exercises as libraryExercises } from '../../data/exercises';
 import { ExerciseCard } from '../../components/workout/ExerciseCard';
+import { ModePicker } from '../../components/workout/ModePicker';
+import { WorkoutCalendar } from '../../components/workout/WorkoutCalendar';
 import {
   TrainingLevel,
   WorkoutDay,
   DayStatus,
   Exercise,
   SetBlock,
+  PlanMode,
 } from '../../types/workout.types';
+import { todayYMD, getTrainingDates } from '../../utils/dateUtils';
 
 const LEVELS: Array<{ id: TrainingLevel; label: string; icon: string; desc: string; color: string; border: string }> = [
   { id: 'beginner', label: 'Beginner', icon: '🌱', desc: 'New to weight training. Plans focused on building a movement foundation.', color: '#f0fdf4', border: '#4ade80' },
@@ -62,6 +66,8 @@ export default function WorkoutsScreen() {
   const [selectedDay, setSelectedDay] = useState<WorkoutDay | null>(null);
   const [showPicker, setShowPicker] = useState(false);
   const [pickerSearch, setPickerSearch] = useState('');
+  const [pendingPlanId, setPendingPlanId] = useState<string | null>(null);
+  const [showModePicker, setShowModePicker] = useState(false);
 
   // These must stay above any early return to satisfy Rules of Hooks
   const dayExerciseIds = useMemo(() => {
@@ -114,7 +120,28 @@ export default function WorkoutsScreen() {
   }
 
   function handleSelectPlan(planId: string) {
-    activatePlan(planId, [1, 2, 4, 5]);
+    setPendingPlanId(planId);
+    setShowModePicker(true);
+  }
+
+  function handleModeSelect(mode: PlanMode) {
+    if (!pendingPlanId) return;
+    const plan = workoutPlans.find((p) => p.id === pendingPlanId);
+    if (!plan) return;
+
+    const schedule = plan.defaultWeeklySchedule;
+    let dateMap: { [dateYMD: string]: number } | undefined;
+
+    if (mode === 'scheduled') {
+      const trainingDayNums = plan.days.filter((d) => !d.isRestDay).map((d) => d.dayNumber);
+      const dates = getTrainingDates(todayYMD(), schedule, trainingDayNums.length);
+      dateMap = {};
+      dates.forEach((date, i) => { dateMap![date] = trainingDayNums[i]; });
+    }
+
+    activatePlan(pendingPlanId, schedule, mode, dateMap);
+    setShowModePicker(false);
+    setPendingPlanId(null);
     setView('detail');
   }
 
@@ -195,6 +222,13 @@ export default function WorkoutsScreen() {
             ))
           )}
         </ScrollView>
+
+        <ModePicker
+          visible={showModePicker}
+          planName={workoutPlans.find((p) => p.id === pendingPlanId)?.name ?? ''}
+          onSelect={handleModeSelect}
+          onCancel={() => { setShowModePicker(false); setPendingPlanId(null); }}
+        />
       </SafeAreaView>
     );
   }
@@ -217,6 +251,17 @@ export default function WorkoutsScreen() {
                 <Text style={styles.resetBtnText}>Reset</Text>
               </TouchableOpacity>
             </View>
+
+            {workoutState.progress && (
+              <WorkoutCalendar
+                progress={workoutState.progress}
+                trainingDayNumbers={trainingDays.map((d) => d.dayNumber)}
+                onPressDay={(dayNumber) => {
+                  const day = activePlan?.days.find((d) => d.dayNumber === dayNumber);
+                  if (day) setSelectedDay(day);
+                }}
+              />
+            )}
 
             <Text style={styles.sectionTitle}>Training Days</Text>
             {trainingDays.map((day) => {

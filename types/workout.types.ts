@@ -43,9 +43,13 @@ export interface WorkoutPlan {
   defaultWeeklySchedule: number[];
 }
 
+export type PlanMode = 'scheduled' | 'daily';
+
 export interface PlanProgress {
   planId: string;
   startDate: string;
+  // How the user chose to track this plan
+  mode: PlanMode;
   dayStatus: { [dayNumber: number]: DayStatus };
   // Actual days of the week the user chose to train (JS Date.getDay() values)
   weeklySchedule: number[];
@@ -55,6 +59,10 @@ export interface PlanProgress {
   customSetBlocks?: { [dayNumber: number]: { [exerciseId: string]: SetBlock[] } };
   // Exercises added by the user per day (from the exercise library)
   customExercises?: { [dayNumber: number]: Exercise[] };
+  // scheduled mode: calendar date (YYYY-MM-DD) → plan dayNumber
+  dateMap?: { [dateYMD: string]: number };
+  // The actual calendar date each plan day was completed (YYYY-MM-DD)
+  completionDates?: { [dayNumber: number]: string };
 }
 
 export interface WorkoutState {
