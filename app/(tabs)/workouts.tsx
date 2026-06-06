@@ -294,6 +294,33 @@ export default function WorkoutsScreen() {
               </TouchableOpacity>
             ))
           )}
+
+          {(workoutState.planHistory ?? []).length > 0 && (
+            <View style={styles.historyBox}>
+              <Text style={styles.historyBoxTitle}>Completed Plans</Text>
+              {workoutState.planHistory.map((record) => (
+                <TouchableOpacity
+                  key={record.id}
+                  style={styles.historyBoxRow}
+                  onPress={() => setView('history')}
+                  activeOpacity={0.7}
+                >
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.historyBoxPlanName}>{record.planName}</Text>
+                    <Text style={styles.historyBoxDates}>
+                      {isoToDisplay(record.startDate)} → {isoToDisplay(record.completedDate)}
+                    </Text>
+                  </View>
+                  <View style={styles.historyBoxBadge}>
+                    <Text style={styles.historyBoxBadgeText}>
+                      {record.finishedDays}/{record.totalDays}
+                    </Text>
+                    <Text style={styles.historyBoxBadgeLabel}>done</Text>
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
         </ScrollView>
 
         <ModePicker
@@ -805,9 +832,18 @@ const styles = StyleSheet.create({
   pickerAdd: { color: '#10b981', fontSize: 13, fontWeight: '700', paddingLeft: 12 },
   pickerRemove: { color: '#ef4444', fontSize: 13, fontWeight: '700', paddingLeft: 12 },
   pickerEmpty: { textAlign: 'center', color: '#9ca3af', fontSize: 13, marginTop: 32 },
-  // History link button
+  // History link button (detail view)
   historyLink: { marginTop: 8, paddingVertical: 12, alignItems: 'center' },
   historyLinkText: { color: '#6366f1', fontSize: 13, fontWeight: '600' },
+  // History box (plans view)
+  historyBox: { backgroundColor: '#fff', borderRadius: 16, padding: 16, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, gap: 2 },
+  historyBoxTitle: { fontSize: 13, fontWeight: '700', color: '#6b7280', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 },
+  historyBoxRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#f3f4f6' },
+  historyBoxPlanName: { fontSize: 14, fontWeight: '600', color: '#111827' },
+  historyBoxDates: { fontSize: 11, color: '#9ca3af', marginTop: 2 },
+  historyBoxBadge: { alignItems: 'center', backgroundColor: '#ecfdf5', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4 },
+  historyBoxBadgeText: { fontSize: 15, fontWeight: '800', color: '#10b981' },
+  historyBoxBadgeLabel: { fontSize: 9, color: '#6b7280' },
   // History view
   historyCard: { backgroundColor: '#fff', borderRadius: 16, padding: 16, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 8, shadowOffset: { width: 0, height: 2 } },
   historyCardHeader: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 12 },
