@@ -16,6 +16,11 @@ import {
   SetBlock,
   PlanMode,
 } from '../../types/workout.types';
+import { isoToDisplay } from '../../utils/dateUtils';
+
+type DailyDateConfirm =
+  | { type: 'add';    dateYMD: string; nextDay: WorkoutDay }
+  | { type: 'remove'; dateYMD: string; dayNumber: number; dayLabel: string };
 
 const LEVELS: Array<{ id: TrainingLevel; label: string; icon: string; desc: string; color: string; border: string }> = [
   { id: 'beginner', label: 'Beginner', icon: '🌱', desc: 'New to weight training. Plans focused on building a movement foundation.', color: '#f0fdf4', border: '#4ade80' },
@@ -59,6 +64,7 @@ export default function WorkoutsScreen() {
     updateExerciseSetBlocks,
     addCustomExercise,
     removeCustomExercise,
+    resetDayProgress,
     resetPlan,
   } = useWorkoutStore();
 
@@ -71,6 +77,7 @@ export default function WorkoutsScreen() {
   const [confirmReset, setConfirmReset] = useState(false);
   // The calendar date the user tapped in daily mode (used as the workout's completion date)
   const [selectedWorkoutDate, setSelectedWorkoutDate] = useState<string | null>(null);
+  const [dailyDateConfirm, setDailyDateConfirm] = useState<DailyDateConfirm | null>(null);
 
   // These must stay above any early return to satisfy Rules of Hooks
   const dayExerciseIds = useMemo(() => {
@@ -161,15 +168,19 @@ export default function WorkoutsScreen() {
     setView('level');
   }
 
-  // Called when the user taps an unlogged date on the calendar in daily mode
-  function handleDailyDatePress(dateYMD: string) {
+  // Tap on an unlogged date in daily mode → confirm "Add?"
+  function handleDailyDateTap(dateYMD: string) {
     const nextDay = trainingDays.find(
       (d) => (workoutState.progress?.dayStatus[d.dayNumber] ?? 'unfinished') === 'unfinished',
     );
-    if (nextDay) {
-      setSelectedWorkoutDate(dateYMD);
-      setSelectedDay(nextDay);
-    }
+    if (nextDay) setDailyDateConfirm({ type: 'add', dateYMD, nextDay });
+  }
+
+  // Tap on a logged date in daily mode → confirm "Remove?"
+  function handleLoggedDailyDateTap(dayNumber: number) {
+    const dateYMD  = workoutState.progress?.completionDates?.[dayNumber];
+    const dayLabel = activePlan?.days.find((d) => d.dayNumber === dayNumber)?.label ?? '';
+    if (dateYMD) setDailyDateConfirm({ type: 'remove', dateYMD, dayNumber, dayLabel });
   }
 
   function handleDayBlockUpdate(dayNumber: number, exerciseId: string, blockIndex: number, newCount: number) {
@@ -308,10 +319,15 @@ export default function WorkoutsScreen() {
                 progress={workoutState.progress}
                 trainingDayNumbers={trainingDays.map((d) => d.dayNumber)}
                 onPressDay={(dayNumber) => {
-                  const day = activePlan?.days.find((d) => d.dayNumber === dayNumber);
-                  if (day) setSelectedDay(day);
+                  const isDailyMode = (workoutState.progress?.mode ?? 'daily') === 'daily';
+                  if (isDailyMode) {
+                    handleLoggedDailyDateTap(dayNumber);
+                  } else {
+                    const day = activePlan?.days.find((d) => d.dayNumber === dayNumber);
+                    if (day) setSelectedDay(day);
+                  }
                 }}
-                onPressDailyDate={handleDailyDatePress}
+                onPressDailyDate={handleDailyDateTap}
               />
             )}
 
@@ -452,6 +468,69 @@ export default function WorkoutsScreen() {
           </SafeAreaView>
         </Modal>
       )}
+
+      {/* ── Daily date confirm modal ─────────────────────────────── */}
+      {dailyDateConfirm && (
+        <Modal visible transparent animationType="fade">
+          <TouchableOpacity
+            style={styles.confirmOverlay}
+            activeOpacity={1}
+            onPress={() => setDailyDateConfirm(null)}
+          >
+            <View style={styles.confirmCard}>
+              <Text style={styles.confirmTitle}>
+                {dailyDateConfirm.type === 'add' ? 'Add to Calendar?' : 'Remove from Calendar?'}
+              </Text>
+              <Text style={styles.confirmDate}>{isoToDisplay(dailyDateConfirm.dateYMD)}</Text>
+
+              {dailyDateConfirm.type === 'add' ? (
+                <Text style={styles.confirmBody}>
+                  Opens{' '}
+                  <Text style={styles.confirmBold}>{dailyDateConfirm.nextDay.label}</Text>
+                </Text>
+              ) : (
+                <Text style={styles.confirmBody}>
+                  Clears all progress for{'\n'}
+                  <Text style={styles.confirmBold}>{dailyDateConfirm.dayLabel}</Text>
+                </Text>
+              )}
+
+              <View style={styles.confirmBtns}>
+                <TouchableOpacity
+                  onPress={() => setDailyDateConfirm(null)}
+                  style={styles.confirmCancelBtn}
+                >
+                  <Text style={styles.confirmCancelText}>Cancel</Text>
+                </TouchableOpacity>
+
+                {dailyDateConfirm.type === 'add' ? (
+                  <TouchableOpacity
+                    onPress={() => {
+                      const { dateYMD, nextDay } = dailyDateConfirm;
+                      setDailyDateConfirm(null);
+                      setSelectedWorkoutDate(dateYMD);
+                      setSelectedDay(nextDay);
+                    }}
+                    style={styles.confirmAddBtn}
+                  >
+                    <Text style={styles.confirmAddText}>Add Day</Text>
+                  </TouchableOpacity>
+                ) : (
+                  <TouchableOpacity
+                    onPress={() => {
+                      resetDayProgress(dailyDateConfirm.dayNumber);
+                      setDailyDateConfirm(null);
+                    }}
+                    style={styles.confirmRemoveBtn}
+                  >
+                    <Text style={styles.confirmRemoveText}>Remove</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            </View>
+          </TouchableOpacity>
+        </Modal>
+      )}
     </SafeAreaView>
   );
 }
@@ -481,6 +560,18 @@ const styles = StyleSheet.create({
   confirmCancelText: { color: '#6b7280', fontSize: 12, fontWeight: '600' },
   confirmResetBtn: { backgroundColor: '#ef4444', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 },
   confirmResetText: { color: '#fff', fontSize: 12, fontWeight: '700' },
+  // Daily date confirm modal
+  confirmOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 32 },
+  confirmCard: { width: '100%', backgroundColor: '#fff', borderRadius: 20, padding: 20, gap: 8 },
+  confirmTitle: { fontSize: 17, fontWeight: '800', color: '#111827', textAlign: 'center' },
+  confirmDate: { fontSize: 14, fontWeight: '600', color: '#6366f1', textAlign: 'center' },
+  confirmBody: { fontSize: 13, color: '#6b7280', textAlign: 'center', lineHeight: 19 },
+  confirmBold: { fontWeight: '700', color: '#111827' },
+  confirmBtns: { flexDirection: 'row', gap: 10, marginTop: 6 },
+  confirmAddBtn: { flex: 1, backgroundColor: '#10b981', borderRadius: 12, paddingVertical: 12, alignItems: 'center' },
+  confirmAddText: { color: '#fff', fontSize: 14, fontWeight: '700' },
+  confirmRemoveBtn: { flex: 1, backgroundColor: '#ef4444', borderRadius: 12, paddingVertical: 12, alignItems: 'center' },
+  confirmRemoveText: { color: '#fff', fontSize: 14, fontWeight: '700' },
   sectionTitle: { fontSize: 14, fontWeight: '700', color: '#111827' },
   dayRow: { backgroundColor: '#fff', borderRadius: 12, padding: 14, flexDirection: 'row', alignItems: 'center', shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 4, shadowOffset: { width: 0, height: 1 } },
   dayLabel: { fontSize: 13, fontWeight: '600', color: '#111827' },

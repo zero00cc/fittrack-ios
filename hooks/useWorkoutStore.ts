@@ -118,6 +118,24 @@ export function useWorkoutStore() {
     [setWorkoutState],
   );
 
+  const resetDayProgress = useCallback(
+    (dayNumber: number) =>
+      setWorkoutState((prev) => {
+        if (!prev.progress) return prev;
+        const dayStatus       = { ...prev.progress.dayStatus };
+        const completionDates = { ...(prev.progress.completionDates ?? {}) };
+        const setProgress     = { ...(prev.progress.setProgress ?? {}) };
+        delete dayStatus[dayNumber];
+        delete completionDates[dayNumber];
+        delete setProgress[dayNumber];
+        return {
+          ...prev,
+          progress: { ...prev.progress, dayStatus, completionDates, setProgress },
+        };
+      }),
+    [setWorkoutState],
+  );
+
   const resetPlan = useCallback(
     () => setWorkoutState((prev) => ({ ...prev, activePlanId: null, progress: null })),
     [setWorkoutState],
@@ -133,6 +151,7 @@ export function useWorkoutStore() {
     updateExerciseSetBlocks,
     addCustomExercise,
     removeCustomExercise,
+    resetDayProgress,
     resetPlan,
   };
 }
