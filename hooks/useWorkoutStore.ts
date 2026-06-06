@@ -57,10 +57,10 @@ export function useWorkoutStore() {
     const u = userRef.current;
     if (!u) return;
 
-    supabase.from('workout_state').upsert(
+    void supabase.from('workout_state').upsert(
       { user_id: u.id, data: workoutState, updated_at: new Date().toISOString() },
       { onConflict: 'user_id' },
-    ).catch(() => {});
+    ).then(undefined, () => {});
   }, [workoutState, loaded]);
 
   // ── Actions — all use functional updaters (stale-closure safe) ──

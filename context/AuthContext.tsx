@@ -1,6 +1,14 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import { Session, User } from '@supabase/supabase-js';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../lib/supabase';
+
+const LOCAL_STORAGE_KEYS = [
+  'fittrack_calorie_history',
+  'fittrack_calorie_settings',
+  'fittrack_workout_state',
+  'fittrack_gallery_meta',
+];
 
 interface AuthContextValue {
   session:  Session | null;
@@ -48,6 +56,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   async function signOut() {
+    await AsyncStorage.multiRemove(LOCAL_STORAGE_KEYS).catch(() => {});
     await supabase.auth.signOut();
   }
 

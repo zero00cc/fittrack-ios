@@ -37,19 +37,19 @@ export function useCalorieStore() {
   function pushHistory(newHistory: CalorieHistory) {
     const u = userRef.current;
     if (!u) return;
-    supabase.from('calorie_history').upsert(
+    void supabase.from('calorie_history').upsert(
       { user_id: u.id, data: newHistory, updated_at: new Date().toISOString() },
       { onConflict: 'user_id' },
-    ).catch(() => {});
+    ).then(undefined, () => {});
   }
 
   function pushSettings(dailyTarget: number) {
     const u = userRef.current;
     if (!u) return;
-    supabase.from('calorie_settings').upsert(
+    void supabase.from('calorie_settings').upsert(
       { user_id: u.id, daily_target: dailyTarget, updated_at: new Date().toISOString() },
       { onConflict: 'user_id' },
-    ).catch(() => {});
+    ).then(undefined, () => {});
   }
 
   // ── Actions ──────────────────────────────────────────────────────
