@@ -34,12 +34,12 @@ export function useWorkoutStore() {
   );
 
   const updateDayStatus = useCallback(
-    (dayNumber: number, status: DayStatus) =>
+    (dayNumber: number, status: DayStatus, workoutDate?: string) =>
       setWorkoutState((prev) => {
         if (!prev.progress) return prev;
         const completionDates = { ...(prev.progress.completionDates ?? {}) };
         if (status === 'finished') {
-          completionDates[dayNumber] = todayYMD();
+          completionDates[dayNumber] = workoutDate ?? todayYMD();
         } else {
           delete completionDates[dayNumber];
         }

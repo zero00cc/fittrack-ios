@@ -15,9 +15,11 @@ interface Props {
   progress: PlanProgress;
   trainingDayNumbers: number[];
   onPressDay: (dayNumber: number) => void;
+  // daily mode only: called when the user taps a date that has no logged workout yet
+  onPressDailyDate?: (dateYMD: string) => void;
 }
 
-export function WorkoutCalendar({ progress, trainingDayNumbers, onPressDay }: Props) {
+export function WorkoutCalendar({ progress, trainingDayNumbers, onPressDay, onPressDailyDate }: Props) {
   const today = todayYMD();
   const [year, setYear] = useState(() => parseInt(today.slice(0, 4)));
   const [month, setMonth] = useState(() => parseInt(today.slice(5, 7)) - 1);
@@ -129,12 +131,21 @@ export function WorkoutCalendar({ progress, trainingDayNumbers, onPressDay }: Pr
               isToday ? '#6366f1' :
               '#374151';
 
+            const isDailyMode = (progress.mode ?? 'daily') === 'daily';
+            const tappable = dayNumber !== null || (isDailyMode && !!onPressDailyDate);
+
             return (
               <TouchableOpacity
                 key={dateYMD}
                 style={styles.cell}
-                onPress={() => { if (dayNumber !== null) onPressDay(dayNumber); }}
-                disabled={dayNumber === null}
+                onPress={() => {
+                  if (dayNumber !== null) {
+                    onPressDay(dayNumber);
+                  } else if (isDailyMode && onPressDailyDate) {
+                    onPressDailyDate(dateYMD);
+                  }
+                }}
+                disabled={!tappable}
                 activeOpacity={0.65}
               >
                 <View style={[

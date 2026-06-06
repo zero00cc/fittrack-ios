@@ -69,6 +69,8 @@ export default function WorkoutsScreen() {
   const [pendingPlanId, setPendingPlanId] = useState<string | null>(null);
   const [showModePicker, setShowModePicker] = useState(false);
   const [confirmReset, setConfirmReset] = useState(false);
+  // The calendar date the user tapped in daily mode (used as the workout's completion date)
+  const [selectedWorkoutDate, setSelectedWorkoutDate] = useState<string | null>(null);
 
   // These must stay above any early return to satisfy Rules of Hooks
   const dayExerciseIds = useMemo(() => {
@@ -159,6 +161,17 @@ export default function WorkoutsScreen() {
     setView('level');
   }
 
+  // Called when the user taps an unlogged date on the calendar in daily mode
+  function handleDailyDatePress(dateYMD: string) {
+    const nextDay = trainingDays.find(
+      (d) => (workoutState.progress?.dayStatus[d.dayNumber] ?? 'unfinished') === 'unfinished',
+    );
+    if (nextDay) {
+      setSelectedWorkoutDate(dateYMD);
+      setSelectedDay(nextDay);
+    }
+  }
+
   function handleDayBlockUpdate(dayNumber: number, exerciseId: string, blockIndex: number, newCount: number) {
     updateSetProgress(dayNumber, blockKey(exerciseId, blockIndex), newCount);
     if (!activePlan) return;
@@ -169,7 +182,7 @@ export default function WorkoutsScreen() {
     const updated = { ...existingProgress, [blockKey(exerciseId, blockIndex)]: newCount };
     const allDone = effectiveExercises.every((ex) => isExerciseDone(ex, updated));
     const currentStatus: DayStatus = workoutState.progress?.dayStatus[dayNumber] ?? 'unfinished';
-    if (allDone) updateDayStatus(dayNumber, 'finished');
+    if (allDone) updateDayStatus(dayNumber, 'finished', selectedWorkoutDate ?? undefined);
     else if (currentStatus === 'finished') updateDayStatus(dayNumber, 'unfinished');
   }
 
@@ -298,6 +311,7 @@ export default function WorkoutsScreen() {
                   const day = activePlan?.days.find((d) => d.dayNumber === dayNumber);
                   if (day) setSelectedDay(day);
                 }}
+                onPressDailyDate={handleDailyDatePress}
               />
             )}
 
@@ -331,11 +345,15 @@ export default function WorkoutsScreen() {
         <Modal visible animationType="slide" presentationStyle="pageSheet">
           <SafeAreaView style={{ flex: 1, backgroundColor: '#f9fafb' }}>
             <View style={styles.modalHeader}>
-              <TouchableOpacity onPress={() => setSelectedDay(null)}>
+              <TouchableOpacity onPress={() => { setSelectedDay(null); setSelectedWorkoutDate(null); }}>
                 <Text style={styles.modalCancel}>Close</Text>
               </TouchableOpacity>
               <Text style={styles.modalTitle} numberOfLines={1}>{selectedDay.label}</Text>
-              <TouchableOpacity onPress={() => { updateDayStatus(selectedDay.dayNumber, 'skipped'); setSelectedDay(null); }}>
+              <TouchableOpacity onPress={() => {
+                updateDayStatus(selectedDay.dayNumber, 'skipped', selectedWorkoutDate ?? undefined);
+                setSelectedDay(null);
+                setSelectedWorkoutDate(null);
+              }}>
                 <Text style={styles.skipBtn}>Skip</Text>
               </TouchableOpacity>
             </View>
@@ -365,7 +383,7 @@ export default function WorkoutsScreen() {
             <View style={styles.modalFooter}>
               <TouchableOpacity
                 style={styles.resetDayBtn}
-                onPress={() => { updateDayStatus(selectedDay.dayNumber, 'unfinished'); setSelectedDay(null); }}
+                onPress={() => { updateDayStatus(selectedDay.dayNumber, 'unfinished'); setSelectedDay(null); setSelectedWorkoutDate(null); }}
               >
                 <Text style={styles.resetDayBtnText}>Reset Day</Text>
               </TouchableOpacity>
