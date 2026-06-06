@@ -8,6 +8,7 @@ import { ExerciseCard } from '../../components/workout/ExerciseCard';
 import { ModePicker } from '../../components/workout/ModePicker';
 import { WorkoutCalendar } from '../../components/workout/WorkoutCalendar';
 import { ScheduleSetup } from '../../components/workout/ScheduleSetup';
+import { Stopwatch } from '../../components/workout/Stopwatch';
 import {
   TrainingLevel,
   WorkoutDay,
@@ -78,6 +79,7 @@ export default function WorkoutsScreen() {
   // The calendar date the user tapped in daily mode (used as the workout's completion date)
   const [selectedWorkoutDate, setSelectedWorkoutDate] = useState<string | null>(null);
   const [dailyDateConfirm, setDailyDateConfirm] = useState<DailyDateConfirm | null>(null);
+  const [showStopwatch, setShowStopwatch] = useState(false);
 
   // These must stay above any early return to satisfy Rules of Hooks
   const dayExerciseIds = useMemo(() => {
@@ -361,7 +363,7 @@ export default function WorkoutsScreen() {
         <Modal visible animationType="slide" presentationStyle="pageSheet">
           <SafeAreaView style={{ flex: 1, backgroundColor: '#f9fafb' }}>
             <View style={styles.modalHeader}>
-              <TouchableOpacity onPress={() => { setSelectedDay(null); setSelectedWorkoutDate(null); }}>
+              <TouchableOpacity onPress={() => { setSelectedDay(null); setSelectedWorkoutDate(null); setShowStopwatch(false); }}>
                 <Text style={styles.modalCancel}>Close</Text>
               </TouchableOpacity>
               <Text style={styles.modalTitle} numberOfLines={1}>{selectedDay.label}</Text>
@@ -369,6 +371,7 @@ export default function WorkoutsScreen() {
                 updateDayStatus(selectedDay.dayNumber, 'skipped', selectedWorkoutDate ?? undefined);
                 setSelectedDay(null);
                 setSelectedWorkoutDate(null);
+                setShowStopwatch(false);
               }}>
                 <Text style={styles.skipBtn}>Skip</Text>
               </TouchableOpacity>
@@ -403,6 +406,7 @@ export default function WorkoutsScreen() {
                   updateDayStatus(selectedDay.dayNumber, 'finished', selectedWorkoutDate ?? undefined);
                   setSelectedDay(null);
                   setSelectedWorkoutDate(null);
+                  setShowStopwatch(false);
                 }}
               >
                 <Text style={styles.completeBtnText}>✓ Mark as Completed</Text>
@@ -413,7 +417,19 @@ export default function WorkoutsScreen() {
               >
                 <Text style={styles.resetDayBtnText}>Reset Day</Text>
               </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.stopwatchBtn}
+                onPress={() => setShowStopwatch(true)}
+              >
+                <Text style={styles.stopwatchBtnText}>⏱ Stopwatch</Text>
+              </TouchableOpacity>
             </View>
+            {/* Stopwatch overlay — floats above the day detail content */}
+            {showStopwatch && (
+              <View style={styles.stopwatchOverlay}>
+                <Stopwatch onClose={() => setShowStopwatch(false)} />
+              </View>
+            )}
           </SafeAreaView>
         </Modal>
       )}
@@ -602,6 +618,9 @@ const styles = StyleSheet.create({
   completeBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
   resetDayBtn: { backgroundColor: '#f3f4f6', borderRadius: 12, padding: 14, alignItems: 'center' },
   resetDayBtnText: { color: '#374151', fontWeight: '700', fontSize: 14 },
+  stopwatchBtn: { marginTop: 8, backgroundColor: '#f0fdf4', borderRadius: 12, padding: 14, alignItems: 'center', borderWidth: 1, borderColor: '#bbf7d0' },
+  stopwatchBtnText: { color: '#16a34a', fontWeight: '700', fontSize: 14 },
+  stopwatchOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 24 },
   addExerciseBtn: {
     marginTop: 12,
     paddingVertical: 14,
