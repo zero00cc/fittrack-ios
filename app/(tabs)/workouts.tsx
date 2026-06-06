@@ -318,20 +318,23 @@ export default function WorkoutsScreen() {
                 return (
                   <TouchableOpacity
                     key={lib.id}
-                    style={[styles.pickerRow, alreadyAdded && styles.pickerRowAdded]}
+                    style={styles.pickerRow}
                     onPress={() => {
-                      if (!alreadyAdded && selectedDay) {
+                      if (!selectedDay) return;
+                      if (alreadyAdded) {
+                        removeCustomExercise(selectedDay.dayNumber, `custom-${lib.id}`);
+                      } else {
                         addCustomExercise(selectedDay.dayNumber, libraryToExercise(lib));
                       }
                     }}
-                    activeOpacity={alreadyAdded ? 1 : 0.7}
+                    activeOpacity={0.7}
                   >
                     <View style={{ flex: 1 }}>
                       <Text style={styles.pickerName}>{lib.name}</Text>
                       <Text style={styles.pickerMuscles}>{lib.muscleGroups.join(' · ')}</Text>
                     </View>
                     {alreadyAdded ? (
-                      <Text style={styles.pickerAdded}>✓ Added</Text>
+                      <Text style={styles.pickerRemove}>✕ Remove</Text>
                     ) : (
                       <Text style={styles.pickerAdd}>+ Add</Text>
                     )}
@@ -414,10 +417,9 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#f3f4f6',
   },
-  pickerRowAdded: { opacity: 0.5 },
   pickerName: { fontSize: 14, fontWeight: '600', color: '#111827' },
   pickerMuscles: { fontSize: 11, color: '#9ca3af', marginTop: 2 },
   pickerAdd: { color: '#10b981', fontSize: 13, fontWeight: '700', paddingLeft: 12 },
-  pickerAdded: { color: '#9ca3af', fontSize: 13, fontWeight: '600', paddingLeft: 12 },
+  pickerRemove: { color: '#ef4444', fontSize: 13, fontWeight: '700', paddingLeft: 12 },
   pickerEmpty: { textAlign: 'center', color: '#9ca3af', fontSize: 13, marginTop: 32 },
 });

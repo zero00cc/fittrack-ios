@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { View, Text, TouchableOpacity, Linking, StyleSheet, TextInput, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, Linking, StyleSheet, Alert } from 'react-native';
 import { Exercise, SetBlock } from '../../types/workout.types';
 
 interface Props {
@@ -10,17 +10,65 @@ interface Props {
   onRemove?: () => void;
 }
 
+// ── Number stepper ────────────────────────────────────────────────
+interface StepperProps {
+  value: number | null;
+  onChange: (v: number | null) => void;
+  step: number;
+  min: number;
+  max: number;
+  nullable: boolean;
+  decimals?: number;
+}
+
+function Stepper({ value, onChange, step, min, max, nullable, decimals = 0 }: StepperProps) {
+  function decrement() {
+    if (value === null) return;
+    const next = parseFloat((value - step).toFixed(decimals + 1));
+    if (next < min) {
+      if (nullable) onChange(null);
+    } else {
+      onChange(next);
+    }
+  }
+
+  function increment() {
+    if (value === null) { onChange(min); return; }
+    const next = parseFloat((value + step).toFixed(decimals + 1));
+    onChange(Math.min(max, next));
+  }
+
+  const canDec = value !== null && (nullable || value > min);
+  const canInc = value === null || value < max;
+  const display = value === null ? '—' : decimals > 0 ? value.toFixed(decimals) : String(value);
+
+  return (
+    <View style={ss.row}>
+      <TouchableOpacity onPress={decrement} disabled={!canDec} style={[ss.btn, !canDec && ss.btnOff]}>
+        <Text style={ss.btnTxt}>−</Text>
+      </TouchableOpacity>
+      <Text style={ss.val}>{display}</Text>
+      <TouchableOpacity onPress={increment} disabled={!canInc} style={[ss.btn, !canInc && ss.btnOff]}>
+        <Text style={ss.btnTxt}>+</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+const ss = StyleSheet.create({
+  row: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 1 },
+  btn: { width: 22, height: 22, borderRadius: 11, backgroundColor: '#f3f4f6', alignItems: 'center', justifyContent: 'center' },
+  btnOff: { opacity: 0.25 },
+  btnTxt: { fontSize: 15, color: '#374151', fontWeight: '700', lineHeight: 17 },
+  val: { fontSize: 11, fontWeight: '700', color: '#111827', minWidth: 22, textAlign: 'center' },
+});
+
+// ── Helpers ───────────────────────────────────────────────────────
 function fmt(val: number | null): string {
   return val === null ? '—' : String(val);
 }
 
-function parseField(text: string): number | null {
-  const t = text.trim();
-  if (t === '' || t === '—') return null;
-  const n = parseFloat(t);
-  return isNaN(n) ? null : n;
-}
-
+// ── ExerciseCard ──────────────────────────────────────────────────
 export function ExerciseCard({ exercise, blockProgress, onUpdateBlock, onEditSetBlocks, onRemove }: Props) {
   const [editing, setEditing] = useState(false);
   const [draftBlocks, setDraftBlocks] = useState<SetBlock[]>([]);
@@ -43,14 +91,9 @@ export function ExerciseCard({ exercise, blockProgress, onUpdateBlock, onEditSet
     setEditing(false);
   }
 
-  function updateDraftSets(rowIdx: number, text: string) {
-    const n = Math.max(1, parseInt(text) || 1);
-    setDraftBlocks((prev) => prev.map((b, i) => (i === rowIdx ? { ...b, sets: n } : b)));
-  }
-
-  function updateDraftField(rowIdx: number, field: 'reps' | 'rpe' | 'load', text: string) {
+  function updateDraft(rowIdx: number, field: keyof SetBlock, value: number | null) {
     setDraftBlocks((prev) =>
-      prev.map((b, i) => (i === rowIdx ? { ...b, [field]: parseField(text) } : b)),
+      prev.map((b, i) => (i === rowIdx ? { ...b, [field]: value } : b)),
     );
   }
 
@@ -66,7 +109,7 @@ export function ExerciseCard({ exercise, blockProgress, onUpdateBlock, onEditSet
 
   return (
     <View style={[styles.card, isAllDone && !editing && styles.cardDone]}>
-      {/* Header */}
+      {/* ── Header ── */}
       <View style={styles.header}>
         <View style={styles.titleRow}>
           {isAllDone && !editing && <Text style={styles.check}>✓ </Text>}
@@ -76,8 +119,8 @@ export function ExerciseCard({ exercise, blockProgress, onUpdateBlock, onEditSet
         </View>
         <View style={styles.headerActions}>
           {!editing && onEditSetBlocks && (
-            <TouchableOpacity onPress={startEdit} style={styles.editBtn}>
-              <Text style={styles.editBtnText}>Edit</Text>
+            <TouchableOpacity onPress={startEdit} style={styles.actionBtn}>
+              <Text style={styles.actionBtnText}>Edit</Text>
             </TouchableOpacity>
           )}
           {!editing && onRemove && (
@@ -88,9 +131,9 @@ export function ExerciseCard({ exercise, blockProgress, onUpdateBlock, onEditSet
                   { text: 'Remove', style: 'destructive', onPress: onRemove },
                 ])
               }
-              style={styles.removeBtn}
+              style={[styles.actionBtn, styles.actionBtnRed]}
             >
-              <Text style={styles.removeBtnText}>✕</Text>
+              <Text style={[styles.actionBtnText, styles.actionBtnTextRed]}>Remove</Text>
             </TouchableOpacity>
           )}
           {!editing && (
@@ -103,7 +146,7 @@ export function ExerciseCard({ exercise, blockProgress, onUpdateBlock, onEditSet
 
       {exercise.notes ? <Text style={styles.notes}>{exercise.notes}</Text> : null}
 
-      {/* Edit mode */}
+      {/* ── Edit mode ── */}
       {editing && (
         <View style={styles.table}>
           <View style={styles.tableHeader}>
@@ -111,48 +154,35 @@ export function ExerciseCard({ exercise, blockProgress, onUpdateBlock, onEditSet
             <Text style={styles.tableHeadCell}>Reps</Text>
             <Text style={styles.tableHeadCell}>RPE</Text>
             <Text style={styles.tableHeadCell}>Load</Text>
-            <Text style={[styles.tableHeadCell, styles.deleteCell]}> </Text>
+            <View style={styles.deleteCol} />
           </View>
+
           {draftBlocks.map((block, i) => (
-            <View key={i} style={styles.tableRow}>
-              <TextInput
-                style={[styles.tableCell, styles.editInput]}
-                value={String(block.sets)}
-                onChangeText={(t) => updateDraftSets(i, t)}
-                keyboardType="number-pad"
-                selectTextOnFocus
+            <View key={i} style={styles.editRow}>
+              <Stepper
+                value={block.sets}
+                onChange={(v) => updateDraft(i, 'sets', v ?? 1)}
+                step={1} min={1} max={20} nullable={false}
               />
-              <TextInput
-                style={[styles.tableCell, styles.editInput]}
-                value={block.reps === null ? '' : String(block.reps)}
-                placeholder="—"
-                placeholderTextColor="#d1d5db"
-                onChangeText={(t) => updateDraftField(i, 'reps', t)}
-                keyboardType="number-pad"
-                selectTextOnFocus
+              <Stepper
+                value={block.reps}
+                onChange={(v) => updateDraft(i, 'reps', v)}
+                step={1} min={1} max={50} nullable
               />
-              <TextInput
-                style={[styles.tableCell, styles.editInput]}
-                value={block.rpe === null ? '' : String(block.rpe)}
-                placeholder="—"
-                placeholderTextColor="#d1d5db"
-                onChangeText={(t) => updateDraftField(i, 'rpe', t)}
-                keyboardType="decimal-pad"
-                selectTextOnFocus
+              <Stepper
+                value={block.rpe}
+                onChange={(v) => updateDraft(i, 'rpe', v)}
+                step={0.5} min={1} max={10} nullable decimals={1}
               />
-              <TextInput
-                style={[styles.tableCell, styles.editInput]}
-                value={block.load === null ? '' : String(block.load)}
-                placeholder="—"
-                placeholderTextColor="#d1d5db"
-                onChangeText={(t) => updateDraftField(i, 'load', t)}
-                keyboardType="decimal-pad"
-                selectTextOnFocus
+              <Stepper
+                value={block.load}
+                onChange={(v) => updateDraft(i, 'load', v)}
+                step={2.5} min={0} max={500} nullable decimals={1}
               />
               <TouchableOpacity
                 onPress={() => removeRow(i)}
                 disabled={draftBlocks.length <= 1}
-                style={[styles.deleteCell, draftBlocks.length <= 1 && styles.disabled]}
+                style={[styles.deleteCol, styles.deleteBtn, draftBlocks.length <= 1 && { opacity: 0.2 }]}
               >
                 <Text style={styles.deleteBtnText}>✕</Text>
               </TouchableOpacity>
@@ -174,7 +204,7 @@ export function ExerciseCard({ exercise, blockProgress, onUpdateBlock, onEditSet
         </View>
       )}
 
-      {/* Read-only table */}
+      {/* ── Read-only table ── */}
       {!editing && (
         <View style={styles.table}>
           <View style={styles.tableHeader}>
@@ -239,52 +269,33 @@ const styles = StyleSheet.create({
   title: { flex: 1, fontSize: 13, fontWeight: '600', color: '#111827' },
   titleDone: { textDecorationLine: 'line-through', color: '#9ca3af' },
   headerActions: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  editBtn: { paddingHorizontal: 8, paddingVertical: 3, backgroundColor: '#eff6ff', borderRadius: 6 },
-  editBtnText: { color: '#3b82f6', fontSize: 11, fontWeight: '700' },
-  removeBtn: { width: 20, height: 20, borderRadius: 10, backgroundColor: '#fee2e2', alignItems: 'center', justifyContent: 'center' },
-  removeBtnText: { color: '#ef4444', fontSize: 10, fontWeight: '700' },
+  actionBtn: { paddingHorizontal: 8, paddingVertical: 4, backgroundColor: '#eff6ff', borderRadius: 6 },
+  actionBtnText: { color: '#3b82f6', fontSize: 11, fontWeight: '700' },
+  actionBtnRed: { backgroundColor: '#fee2e2' },
+  actionBtnTextRed: { color: '#ef4444' },
   watch: { fontSize: 11, color: '#ef4444', fontWeight: '600' },
   notes: { fontSize: 11, color: '#9ca3af', marginTop: 2 },
   table: { marginTop: 8 },
   tableHeader: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: '#f3f4f6', paddingBottom: 4, marginBottom: 2 },
   tableHeadCell: { flex: 1, fontSize: 10, color: '#9ca3af', fontWeight: '600' },
+  // Edit mode
+  editRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: '#f9fafb' },
+  deleteCol: { width: 28, alignItems: 'center', justifyContent: 'center' },
+  deleteBtn: {},
+  deleteBtnText: { color: '#ef4444', fontSize: 13, fontWeight: '700' },
+  addRowBtn: { marginTop: 8, paddingVertical: 8, alignItems: 'center', borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 8, borderStyle: 'dashed' },
+  addRowBtnText: { color: '#6b7280', fontSize: 11, fontWeight: '600' },
+  editActions: { flexDirection: 'row', gap: 8, marginTop: 10 },
+  cancelBtn: { flex: 1, paddingVertical: 10, alignItems: 'center', backgroundColor: '#f3f4f6', borderRadius: 8 },
+  cancelBtnText: { color: '#374151', fontSize: 12, fontWeight: '600' },
+  saveBtn: { flex: 1, paddingVertical: 10, alignItems: 'center', backgroundColor: '#10b981', borderRadius: 8 },
+  saveBtnText: { color: '#fff', fontSize: 12, fontWeight: '700' },
+  // Read-only
   tableRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 5 },
   tableRowDone: { opacity: 0.4 },
   tableCell: { flex: 1, fontSize: 11, color: '#374151' },
   muted: { color: '#9ca3af' },
   actionCell: { flex: 1.8, alignItems: 'flex-start' },
-  // Edit mode
-  editInput: {
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-    borderRadius: 4,
-    paddingHorizontal: 4,
-    paddingVertical: 3,
-    fontSize: 11,
-    color: '#111827',
-    textAlign: 'center',
-    backgroundColor: '#fff',
-    marginRight: 2,
-  },
-  deleteCell: { flex: 0.6, alignItems: 'center', justifyContent: 'center' },
-  deleteBtnText: { color: '#ef4444', fontSize: 12, fontWeight: '700' },
-  disabled: { opacity: 0.2 },
-  addRowBtn: {
-    marginTop: 6,
-    paddingVertical: 7,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-    borderRadius: 8,
-    borderStyle: 'dashed',
-  },
-  addRowBtnText: { color: '#6b7280', fontSize: 11, fontWeight: '600' },
-  editActions: { flexDirection: 'row', gap: 8, marginTop: 8 },
-  cancelBtn: { flex: 1, paddingVertical: 9, alignItems: 'center', backgroundColor: '#f3f4f6', borderRadius: 8 },
-  cancelBtnText: { color: '#374151', fontSize: 12, fontWeight: '600' },
-  saveBtn: { flex: 1, paddingVertical: 9, alignItems: 'center', backgroundColor: '#10b981', borderRadius: 8 },
-  saveBtnText: { color: '#fff', fontSize: 12, fontWeight: '700' },
-  // Read-only counters
   toggleBtn: { width: 24, height: 24, borderRadius: 12, borderWidth: 2, borderColor: '#d1d5db', alignItems: 'center', justifyContent: 'center' },
   toggleBtnDone: { backgroundColor: '#10b981', borderColor: '#10b981' },
   toggleBtnText: { fontSize: 11, color: '#d1d5db', fontWeight: '700' },
