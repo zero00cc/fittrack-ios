@@ -1,21 +1,69 @@
-import { useCallback } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { useAsyncStorage } from './useAsyncStorage';
 import { WorkoutState, TrainingLevel, DayStatus, SetBlock, Exercise, PlanMode } from '../types/workout.types';
 import { todayYMD } from '../utils/dateUtils';
+import { supabase } from '../lib/supabase';
+import { useAuth } from '../context/AuthContext';
 
 const WORKOUT_KEY = 'fittrack_workout_state';
 
 const defaultState: WorkoutState = {
   selectedLevel: null,
-  activePlanId: null,
-  progress: null,
+  activePlanId:  null,
+  progress:      null,
 };
 
 export function useWorkoutStore() {
+  const { user } = useAuth();
+  const userRef = useRef(user);
+  userRef.current = user;
+
   const [workoutState, setWorkoutState, loaded] = useAsyncStorage<WorkoutState>(WORKOUT_KEY, defaultState);
 
-  // All actions use the functional-updater form of setWorkoutState so they
-  // always operate on the latest state, never a stale closure snapshot.
+  // Guards for the reactive push effect
+  const remoteFetched  = useRef(false); // true once the Supabase fetch has returned
+  const skipNextPush   = useRef(false); // true when a change came from the remote load
+
+  // ── Pull from Supabase when the user signs in ──────────────────
+  useEffect(() => {
+    remoteFetched.current = false; // reset on every user change
+    if (!user) return;
+
+    supabase.from('workout_state')
+      .select('data')
+      .eq('user_id', user.id)
+      .single()
+      .then(({ data }) => {
+        remoteFetched.current = true;
+        if (data?.data) {
+          skipNextPush.current = true;          // the next workoutState change is from us — don't echo it back
+          setWorkoutState(data.data as WorkoutState);
+        }
+      });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
+
+  // ── Push to Supabase after every LOCAL change ──────────────────
+  useEffect(() => {
+    // Wait until AsyncStorage has loaded and the initial remote fetch is done
+    if (!loaded || !remoteFetched.current) return;
+
+    // Skip this one push (it came from the remote load above, not a user action)
+    if (skipNextPush.current) {
+      skipNextPush.current = false;
+      return;
+    }
+
+    const u = userRef.current;
+    if (!u) return;
+
+    supabase.from('workout_state').upsert(
+      { user_id: u.id, data: workoutState, updated_at: new Date().toISOString() },
+      { onConflict: 'user_id' },
+    ).catch(() => {});
+  }, [workoutState, loaded]);
+
+  // ── Actions — all use functional updaters (stale-closure safe) ──
 
   const setLevel = useCallback(
     (level: TrainingLevel) =>
@@ -88,7 +136,7 @@ export function useWorkoutStore() {
       setWorkoutState((prev) => {
         if (!prev.progress) return prev;
         const existing = prev.progress.customExercises ?? {};
-        const dayList = existing[dayNumber] ?? [];
+        const dayList  = existing[dayNumber] ?? [];
         if (dayList.some((e) => e.id === exercise.id)) return prev;
         return {
           ...prev,
@@ -106,13 +154,10 @@ export function useWorkoutStore() {
       setWorkoutState((prev) => {
         if (!prev.progress) return prev;
         const existing = prev.progress.customExercises ?? {};
-        const dayList = (existing[dayNumber] ?? []).filter((e) => e.id !== exerciseId);
+        const dayList  = (existing[dayNumber] ?? []).filter((e) => e.id !== exerciseId);
         return {
           ...prev,
-          progress: {
-            ...prev.progress,
-            customExercises: { ...existing, [dayNumber]: dayList },
-          },
+          progress: { ...prev.progress, customExercises: { ...existing, [dayNumber]: dayList } },
         };
       }),
     [setWorkoutState],
