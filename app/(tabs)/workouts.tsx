@@ -398,6 +398,16 @@ export default function WorkoutsScreen() {
 
             <View style={styles.modalFooter}>
               <TouchableOpacity
+                style={styles.completeBtn}
+                onPress={() => {
+                  updateDayStatus(selectedDay.dayNumber, 'finished', selectedWorkoutDate ?? undefined);
+                  setSelectedDay(null);
+                  setSelectedWorkoutDate(null);
+                }}
+              >
+                <Text style={styles.completeBtnText}>✓ Mark as Completed</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
                 style={styles.resetDayBtn}
                 onPress={() => { updateDayStatus(selectedDay.dayNumber, 'unfinished'); setSelectedDay(null); setSelectedWorkoutDate(null); }}
               >
@@ -586,6 +596,8 @@ const styles = StyleSheet.create({
   modalTitle: { flex: 1, fontSize: 15, fontWeight: '700', color: '#111827', textAlign: 'center', marginHorizontal: 8 },
   skipBtn: { color: '#f59e0b', fontSize: 15, fontWeight: '700', minWidth: 50, textAlign: 'right' },
   modalFooter: { padding: 16, borderTopWidth: 1, borderTopColor: '#e5e7eb' },
+  completeBtn: { backgroundColor: '#10b981', borderRadius: 12, padding: 14, alignItems: 'center', marginBottom: 8 },
+  completeBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
   resetDayBtn: { backgroundColor: '#f3f4f6', borderRadius: 12, padding: 14, alignItems: 'center' },
   resetDayBtnText: { color: '#374151', fontWeight: '700', fontSize: 14 },
   addExerciseBtn: {
