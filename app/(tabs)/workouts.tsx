@@ -1,10 +1,17 @@
-import { useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Modal, StyleSheet, Alert } from 'react-native';
+import { useState, useMemo } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, Modal, StyleSheet, Alert, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useWorkoutStore } from '../../hooks/useWorkoutStore';
 import { workoutPlans } from '../../data/workoutPlans';
+import { exercises as libraryExercises } from '../../data/exercises';
 import { ExerciseCard } from '../../components/workout/ExerciseCard';
-import { TrainingLevel, WorkoutDay, DayStatus, Exercise } from '../../types/workout.types';
+import {
+  TrainingLevel,
+  WorkoutDay,
+  DayStatus,
+  Exercise,
+  SetBlock,
+} from '../../types/workout.types';
 
 const LEVELS: Array<{ id: TrainingLevel; label: string; icon: string; desc: string; color: string; border: string }> = [
   { id: 'beginner', label: 'Beginner', icon: '🌱', desc: 'New to weight training. Plans focused on building a movement foundation.', color: '#f0fdf4', border: '#4ade80' },
@@ -19,20 +26,42 @@ function blockKey(exerciseId: string, blockIndex: number) {
   return `${exerciseId}-${blockIndex}`;
 }
 
-function totalSets(ex: Exercise): number {
-  if (ex.setBlocks) return ex.setBlocks.reduce((s, b) => s + b.sets, 0);
-  return ex.sets ?? 1;
+function totalBlocks(ex: Exercise): SetBlock[] {
+  return ex.setBlocks ?? [{ sets: ex.sets ?? 1, reps: null, rpe: null, load: null }];
 }
 
 function isExerciseDone(ex: Exercise, progress: Record<string, number>): boolean {
-  if (ex.setBlocks) return ex.setBlocks.every((b, i) => (progress[blockKey(ex.id, i)] ?? 0) >= b.sets);
-  return (progress[blockKey(ex.id, 0)] ?? 0) >= (ex.sets ?? 1);
+  return totalBlocks(ex).every((b, i) => (progress[blockKey(ex.id, i)] ?? 0) >= b.sets);
+}
+
+function libraryToExercise(lib: (typeof libraryExercises)[number]): Exercise {
+  const slug = lib.name.toLowerCase().replace(/\s+/g, '+').replace(/[()]/g, '');
+  return {
+    id: `custom-${lib.id}`,
+    name: lib.name,
+    youtubeUrl: `https://www.youtube.com/results?search_query=how+to+${slug}+proper+form`,
+    setBlocks: [{ sets: 3, reps: null, rpe: null, load: null }],
+  };
 }
 
 export default function WorkoutsScreen() {
-  const { workoutState, loaded, setLevel, activatePlan, updateDayStatus, updateSetProgress, resetPlan } = useWorkoutStore();
+  const {
+    workoutState,
+    loaded,
+    setLevel,
+    activatePlan,
+    updateDayStatus,
+    updateSetProgress,
+    updateExerciseSetBlocks,
+    addCustomExercise,
+    removeCustomExercise,
+    resetPlan,
+  } = useWorkoutStore();
+
   const [view, setView] = useState<'level' | 'plans' | 'detail'>('level');
   const [selectedDay, setSelectedDay] = useState<WorkoutDay | null>(null);
+  const [showPicker, setShowPicker] = useState(false);
+  const [pickerSearch, setPickerSearch] = useState('');
 
   if (!loaded) return <View style={styles.center}><Text style={styles.loading}>Loading…</Text></View>;
 
@@ -41,8 +70,26 @@ export default function WorkoutsScreen() {
     : [];
 
   const activePlan = workoutPlans.find((p) => p.id === workoutState.activePlanId) ?? null;
-
   const trainingDays = activePlan?.days.filter((d) => !d.isRestDay) ?? [];
+
+  // Apply custom set blocks and append custom exercises for a given day
+  function getEffectiveExercises(day: WorkoutDay): Exercise[] {
+    const customBlocks = workoutState.progress?.customSetBlocks?.[day.dayNumber] ?? {};
+    const plan = day.exercises.map((ex) => {
+      const override = customBlocks[ex.id];
+      return override ? { ...ex, setBlocks: override } : ex;
+    });
+    const custom = (workoutState.progress?.customExercises?.[day.dayNumber] ?? []).map((ex) => {
+      const override = customBlocks[ex.id];
+      return override ? { ...ex, setBlocks: override } : ex;
+    });
+    return [...plan, ...custom];
+  }
+
+  function totalExerciseCount(day: WorkoutDay): number {
+    const custom = workoutState.progress?.customExercises?.[day.dayNumber] ?? [];
+    return day.exercises.length + custom.length;
+  }
 
   function handleSelectLevel(level: TrainingLevel) {
     setLevel(level);
@@ -65,14 +112,32 @@ export default function WorkoutsScreen() {
     updateSetProgress(dayNumber, blockKey(exerciseId, blockIndex), newCount);
     if (!activePlan) return;
     const day = activePlan.days.find((d) => d.dayNumber === dayNumber);
-    if (!day || day.exercises.length === 0) return;
+    if (!day) return;
+    const effectiveExercises = getEffectiveExercises(day);
     const existingProgress = workoutState.progress?.setProgress?.[dayNumber] ?? {};
     const updated = { ...existingProgress, [blockKey(exerciseId, blockIndex)]: newCount };
-    const allDone = day.exercises.every((ex) => isExerciseDone(ex, updated));
+    const allDone = effectiveExercises.every((ex) => isExerciseDone(ex, updated));
     const currentStatus: DayStatus = workoutState.progress?.dayStatus[dayNumber] ?? 'unfinished';
     if (allDone) updateDayStatus(dayNumber, 'finished');
     else if (currentStatus === 'finished') updateDayStatus(dayNumber, 'unfinished');
   }
+
+  // IDs already in the selected day (plan + custom)
+  const dayExerciseIds = useMemo(() => {
+    if (!selectedDay) return new Set<string>();
+    const planIds = selectedDay.exercises.map((e) => `custom-${e.id}`);
+    const customIds = (workoutState.progress?.customExercises?.[selectedDay.dayNumber] ?? []).map((e) => e.id);
+    return new Set([...planIds, ...customIds]);
+  }, [selectedDay, workoutState.progress?.customExercises]);
+
+  const filteredLibrary = useMemo(() => {
+    const q = pickerSearch.toLowerCase();
+    return libraryExercises.filter(
+      (e) =>
+        e.name.toLowerCase().includes(q) ||
+        e.muscleGroups.some((m) => m.toLowerCase().includes(q)),
+    );
+  }, [pickerSearch]);
 
   // ── Level selector ──────────────────────────────────────────────
   if (view === 'level') {
@@ -156,7 +221,7 @@ export default function WorkoutsScreen() {
                 <TouchableOpacity key={day.dayNumber} style={styles.dayRow} onPress={() => setSelectedDay(day)} activeOpacity={0.7}>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.dayLabel}>{day.label}</Text>
-                    <Text style={styles.dayExCount}>{day.exercises.length} exercises</Text>
+                    <Text style={styles.dayExCount}>{totalExerciseCount(day)} exercises</Text>
                   </View>
                   <Text style={[styles.dayStatus, { color: STATUS_COLORS[status] }]}>{STATUS_LABELS[status]}</Text>
                 </TouchableOpacity>
@@ -174,7 +239,7 @@ export default function WorkoutsScreen() {
         )}
       </ScrollView>
 
-      {/* Day detail modal */}
+      {/* ── Day detail modal ─────────────────────────────────────── */}
       {selectedDay && (
         <Modal visible animationType="slide" presentationStyle="pageSheet">
           <SafeAreaView style={{ flex: 1, backgroundColor: '#f9fafb' }}>
@@ -187,22 +252,29 @@ export default function WorkoutsScreen() {
                 <Text style={styles.skipBtn}>Skip</Text>
               </TouchableOpacity>
             </View>
+
             <ScrollView contentContainerStyle={{ padding: 16 }}>
-              {selectedDay.exercises.map((ex) => {
+              {getEffectiveExercises(selectedDay).map((ex) => {
+                const isCustom = (workoutState.progress?.customExercises?.[selectedDay.dayNumber] ?? []).some((e) => e.id === ex.id);
                 const dayProgress = workoutState.progress?.setProgress?.[selectedDay.dayNumber] ?? {};
-                const blockProgress = ex.setBlocks
-                  ? ex.setBlocks.map((_, i) => dayProgress[blockKey(ex.id, i)] ?? 0)
-                  : [dayProgress[blockKey(ex.id, 0)] ?? 0];
+                const blockProgress = totalBlocks(ex).map((_, i) => dayProgress[blockKey(ex.id, i)] ?? 0);
                 return (
                   <ExerciseCard
                     key={ex.id}
                     exercise={ex}
                     blockProgress={blockProgress}
                     onUpdateBlock={(blockIndex, n) => handleDayBlockUpdate(selectedDay.dayNumber, ex.id, blockIndex, n)}
+                    onEditSetBlocks={(newBlocks) => updateExerciseSetBlocks(selectedDay.dayNumber, ex.id, newBlocks)}
+                    onRemove={isCustom ? () => removeCustomExercise(selectedDay.dayNumber, ex.id) : undefined}
                   />
                 );
               })}
+
+              <TouchableOpacity style={styles.addExerciseBtn} onPress={() => { setPickerSearch(''); setShowPicker(true); }}>
+                <Text style={styles.addExerciseBtnText}>+ Add Exercise from Library</Text>
+              </TouchableOpacity>
             </ScrollView>
+
             <View style={styles.modalFooter}>
               <TouchableOpacity
                 style={styles.resetDayBtn}
@@ -211,6 +283,64 @@ export default function WorkoutsScreen() {
                 <Text style={styles.resetDayBtnText}>Reset Day</Text>
               </TouchableOpacity>
             </View>
+          </SafeAreaView>
+        </Modal>
+      )}
+
+      {/* ── Exercise picker modal ────────────────────────────────── */}
+      {showPicker && selectedDay && (
+        <Modal visible animationType="slide" presentationStyle="pageSheet">
+          <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }}>
+            <View style={styles.modalHeader}>
+              <TouchableOpacity onPress={() => setShowPicker(false)}>
+                <Text style={styles.modalCancel}>Cancel</Text>
+              </TouchableOpacity>
+              <Text style={styles.modalTitle}>Exercise Library</Text>
+              <View style={{ minWidth: 50 }} />
+            </View>
+
+            <View style={styles.searchRow}>
+              <TextInput
+                style={styles.searchInput}
+                value={pickerSearch}
+                onChangeText={setPickerSearch}
+                placeholder="Search by name or muscle group…"
+                placeholderTextColor="#9ca3af"
+                clearButtonMode="while-editing"
+                autoFocus
+              />
+            </View>
+
+            <ScrollView contentContainerStyle={{ padding: 12 }}>
+              {filteredLibrary.map((lib) => {
+                const alreadyAdded = dayExerciseIds.has(`custom-${lib.id}`);
+                return (
+                  <TouchableOpacity
+                    key={lib.id}
+                    style={[styles.pickerRow, alreadyAdded && styles.pickerRowAdded]}
+                    onPress={() => {
+                      if (!alreadyAdded && selectedDay) {
+                        addCustomExercise(selectedDay.dayNumber, libraryToExercise(lib));
+                      }
+                    }}
+                    activeOpacity={alreadyAdded ? 1 : 0.7}
+                  >
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.pickerName}>{lib.name}</Text>
+                      <Text style={styles.pickerMuscles}>{lib.muscleGroups.join(' · ')}</Text>
+                    </View>
+                    {alreadyAdded ? (
+                      <Text style={styles.pickerAdded}>✓ Added</Text>
+                    ) : (
+                      <Text style={styles.pickerAdd}>+ Add</Text>
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
+              {filteredLibrary.length === 0 && (
+                <Text style={styles.pickerEmpty}>No exercises match "{pickerSearch}"</Text>
+              )}
+            </ScrollView>
           </SafeAreaView>
         </Modal>
       )}
@@ -254,4 +384,39 @@ const styles = StyleSheet.create({
   modalFooter: { padding: 16, borderTopWidth: 1, borderTopColor: '#e5e7eb' },
   resetDayBtn: { backgroundColor: '#f3f4f6', borderRadius: 12, padding: 14, alignItems: 'center' },
   resetDayBtnText: { color: '#374151', fontWeight: '700', fontSize: 14 },
+  addExerciseBtn: {
+    marginTop: 12,
+    paddingVertical: 14,
+    alignItems: 'center',
+    backgroundColor: '#f0fdf4',
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: '#4ade80',
+    borderStyle: 'dashed',
+  },
+  addExerciseBtnText: { color: '#16a34a', fontSize: 13, fontWeight: '700' },
+  // Picker
+  searchRow: { padding: 12, borderBottomWidth: 1, borderBottomColor: '#f3f4f6' },
+  searchInput: {
+    backgroundColor: '#f3f4f6',
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    fontSize: 14,
+    color: '#111827',
+  },
+  pickerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 4,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f3f4f6',
+  },
+  pickerRowAdded: { opacity: 0.5 },
+  pickerName: { fontSize: 14, fontWeight: '600', color: '#111827' },
+  pickerMuscles: { fontSize: 11, color: '#9ca3af', marginTop: 2 },
+  pickerAdd: { color: '#10b981', fontSize: 13, fontWeight: '700', paddingLeft: 12 },
+  pickerAdded: { color: '#9ca3af', fontSize: 13, fontWeight: '600', paddingLeft: 12 },
+  pickerEmpty: { textAlign: 'center', color: '#9ca3af', fontSize: 13, marginTop: 32 },
 });

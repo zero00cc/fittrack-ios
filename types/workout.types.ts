@@ -51,6 +51,10 @@ export interface PlanProgress {
   weeklySchedule: number[];
   // Completed set counts: dayNumber → `${exerciseId}-${blockIndex}` → completedSets
   setProgress?: { [dayNumber: number]: { [key: string]: number } };
+  // User-edited set blocks: dayNumber → exerciseId → overridden blocks
+  customSetBlocks?: { [dayNumber: number]: { [exerciseId: string]: SetBlock[] } };
+  // Exercises added by the user per day (from the exercise library)
+  customExercises?: { [dayNumber: number]: Exercise[] };
 }
 
 export interface WorkoutState {
