@@ -14,106 +14,106 @@ const defaultState: WorkoutState = {
 export function useWorkoutStore() {
   const [workoutState, setWorkoutState, loaded] = useAsyncStorage<WorkoutState>(WORKOUT_KEY, defaultState);
 
+  // All actions use the functional-updater form of setWorkoutState so they
+  // always operate on the latest state, never a stale closure snapshot.
+
   const setLevel = useCallback(
     (level: TrainingLevel) =>
-      setWorkoutState({ ...workoutState, selectedLevel: level, activePlanId: null, progress: null }),
-    [workoutState, setWorkoutState],
+      setWorkoutState((prev) => ({ ...prev, selectedLevel: level, activePlanId: null, progress: null })),
+    [setWorkoutState],
   );
 
   const activatePlan = useCallback(
     (planId: string, weeklySchedule: number[]) =>
-      setWorkoutState({
-        ...workoutState,
+      setWorkoutState((prev) => ({
+        ...prev,
         activePlanId: planId,
         progress: { planId, startDate: todayYMD(), dayStatus: {}, weeklySchedule },
-      }),
-    [workoutState, setWorkoutState],
+      })),
+    [setWorkoutState],
   );
 
   const updateDayStatus = useCallback(
-    (dayNumber: number, status: DayStatus) => {
-      if (!workoutState.progress) return;
-      setWorkoutState({
-        ...workoutState,
-        progress: {
-          ...workoutState.progress,
-          dayStatus: { ...workoutState.progress.dayStatus, [dayNumber]: status },
-        },
-      });
-    },
-    [workoutState, setWorkoutState],
+    (dayNumber: number, status: DayStatus) =>
+      setWorkoutState((prev) => {
+        if (!prev.progress) return prev;
+        return {
+          ...prev,
+          progress: {
+            ...prev.progress,
+            dayStatus: { ...prev.progress.dayStatus, [dayNumber]: status },
+          },
+        };
+      }),
+    [setWorkoutState],
   );
 
   const updateSetProgress = useCallback(
-    (dayNumber: number, key: string, completedSets: number) => {
-      if (!workoutState.progress) return;
-      const existing = workoutState.progress.setProgress ?? {};
-      const dayMap = { ...(existing[dayNumber] ?? {}) };
-      dayMap[key] = completedSets;
-      setWorkoutState({
-        ...workoutState,
-        progress: {
-          ...workoutState.progress,
-          setProgress: { ...existing, [dayNumber]: dayMap },
-        },
-      });
-    },
-    [workoutState, setWorkoutState],
+    (dayNumber: number, key: string, completedSets: number) =>
+      setWorkoutState((prev) => {
+        if (!prev.progress) return prev;
+        const existing = prev.progress.setProgress ?? {};
+        const dayMap = { ...(existing[dayNumber] ?? {}), [key]: completedSets };
+        return {
+          ...prev,
+          progress: { ...prev.progress, setProgress: { ...existing, [dayNumber]: dayMap } },
+        };
+      }),
+    [setWorkoutState],
   );
 
   const updateExerciseSetBlocks = useCallback(
-    (dayNumber: number, exerciseId: string, blocks: SetBlock[]) => {
-      if (!workoutState.progress) return;
-      const existing = workoutState.progress.customSetBlocks ?? {};
-      const dayMap = { ...(existing[dayNumber] ?? {}) };
-      dayMap[exerciseId] = blocks;
-      setWorkoutState({
-        ...workoutState,
-        progress: {
-          ...workoutState.progress,
-          customSetBlocks: { ...existing, [dayNumber]: dayMap },
-        },
-      });
-    },
-    [workoutState, setWorkoutState],
+    (dayNumber: number, exerciseId: string, blocks: SetBlock[]) =>
+      setWorkoutState((prev) => {
+        if (!prev.progress) return prev;
+        const existing = prev.progress.customSetBlocks ?? {};
+        const dayMap = { ...(existing[dayNumber] ?? {}), [exerciseId]: blocks };
+        return {
+          ...prev,
+          progress: { ...prev.progress, customSetBlocks: { ...existing, [dayNumber]: dayMap } },
+        };
+      }),
+    [setWorkoutState],
   );
 
   const addCustomExercise = useCallback(
-    (dayNumber: number, exercise: Exercise) => {
-      if (!workoutState.progress) return;
-      const existing = workoutState.progress.customExercises ?? {};
-      const dayList = existing[dayNumber] ?? [];
-      if (dayList.some((e) => e.id === exercise.id)) return;
-      setWorkoutState({
-        ...workoutState,
-        progress: {
-          ...workoutState.progress,
-          customExercises: { ...existing, [dayNumber]: [...dayList, exercise] },
-        },
-      });
-    },
-    [workoutState, setWorkoutState],
+    (dayNumber: number, exercise: Exercise) =>
+      setWorkoutState((prev) => {
+        if (!prev.progress) return prev;
+        const existing = prev.progress.customExercises ?? {};
+        const dayList = existing[dayNumber] ?? [];
+        if (dayList.some((e) => e.id === exercise.id)) return prev;
+        return {
+          ...prev,
+          progress: {
+            ...prev.progress,
+            customExercises: { ...existing, [dayNumber]: [...dayList, exercise] },
+          },
+        };
+      }),
+    [setWorkoutState],
   );
 
   const removeCustomExercise = useCallback(
-    (dayNumber: number, exerciseId: string) => {
-      if (!workoutState.progress) return;
-      const existing = workoutState.progress.customExercises ?? {};
-      const dayList = (existing[dayNumber] ?? []).filter((e) => e.id !== exerciseId);
-      setWorkoutState({
-        ...workoutState,
-        progress: {
-          ...workoutState.progress,
-          customExercises: { ...existing, [dayNumber]: dayList },
-        },
-      });
-    },
-    [workoutState, setWorkoutState],
+    (dayNumber: number, exerciseId: string) =>
+      setWorkoutState((prev) => {
+        if (!prev.progress) return prev;
+        const existing = prev.progress.customExercises ?? {};
+        const dayList = (existing[dayNumber] ?? []).filter((e) => e.id !== exerciseId);
+        return {
+          ...prev,
+          progress: {
+            ...prev.progress,
+            customExercises: { ...existing, [dayNumber]: dayList },
+          },
+        };
+      }),
+    [setWorkoutState],
   );
 
   const resetPlan = useCallback(
-    () => setWorkoutState({ ...workoutState, activePlanId: null, progress: null }),
-    [workoutState, setWorkoutState],
+    () => setWorkoutState((prev) => ({ ...prev, activePlanId: null, progress: null })),
+    [setWorkoutState],
   );
 
   return {

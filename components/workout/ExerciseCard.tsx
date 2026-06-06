@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { View, Text, TouchableOpacity, Linking, StyleSheet, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, Linking, StyleSheet } from 'react-native';
 import { Exercise, SetBlock } from '../../types/workout.types';
 
 interface Props {
@@ -125,12 +125,7 @@ export function ExerciseCard({ exercise, blockProgress, onUpdateBlock, onEditSet
           )}
           {!editing && onRemove && (
             <TouchableOpacity
-              onPress={() =>
-                Alert.alert('Remove Exercise', `Remove "${exercise.name}" from this day?`, [
-                  { text: 'Cancel', style: 'cancel' },
-                  { text: 'Remove', style: 'destructive', onPress: onRemove },
-                ])
-              }
+              onPress={onRemove}
               style={[styles.actionBtn, styles.actionBtnRed]}
             >
               <Text style={[styles.actionBtnText, styles.actionBtnTextRed]}>Remove</Text>
