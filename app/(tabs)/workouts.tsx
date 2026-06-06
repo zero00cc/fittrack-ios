@@ -427,7 +427,9 @@ export default function WorkoutsScreen() {
                 <Text style={styles.modalCancel}>Cancel</Text>
               </TouchableOpacity>
               <Text style={styles.modalTitle}>Exercise Library</Text>
-              <View style={{ minWidth: 50 }} />
+              <TouchableOpacity onPress={() => setShowPicker(false)} style={styles.pickerConfirmBtn}>
+                <Text style={styles.pickerConfirmText}>Done</Text>
+              </TouchableOpacity>
             </View>
 
             <View style={styles.searchRow}>
@@ -631,6 +633,8 @@ const styles = StyleSheet.create({
   },
   pickerName: { fontSize: 14, fontWeight: '600', color: '#111827' },
   pickerMuscles: { fontSize: 11, color: '#9ca3af', marginTop: 2 },
+  pickerConfirmBtn: { backgroundColor: '#10b981', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 5, minWidth: 50, alignItems: 'center' },
+  pickerConfirmText: { color: '#fff', fontSize: 13, fontWeight: '700' },
   pickerAdd: { color: '#10b981', fontSize: 13, fontWeight: '700', paddingLeft: 12 },
   pickerRemove: { color: '#ef4444', fontSize: 13, fontWeight: '700', paddingLeft: 12 },
   pickerEmpty: { textAlign: 'center', color: '#9ca3af', fontSize: 13, marginTop: 32 },
