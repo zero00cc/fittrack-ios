@@ -51,12 +51,12 @@ export default function RankingScreen() {
     }
   }, [myProfile]);
 
-  // Load leaderboard whenever filter changes
+  // Load leaderboard whenever filter or screen changes
   useEffect(() => {
-    if (isUnlocked && screen === 'leaderboard') {
+    if (screen === 'leaderboard') {
       fetchLeaderboard(filterClass, filterGender);
     }
-  }, [filterClass, filterGender, screen, isUnlocked]);
+  }, [filterClass, filterGender, screen]);
 
   // ── Locked state ─────────────────────────────────────────────────
   if (!isUnlocked) {
@@ -181,7 +181,7 @@ export default function RankingScreen() {
           <TouchableOpacity style={styles.saveBtn} onPress={handleSave} disabled={saving}>
             {saving
               ? <ActivityIndicator color="#fff" />
-              : <Text style={styles.saveBtnText}>Save &amp; View Ranking</Text>
+              : <Text style={styles.saveBtnText}>Save & View Ranking</Text>
             }
           </TouchableOpacity>
         </ScrollView>
