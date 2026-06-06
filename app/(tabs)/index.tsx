@@ -1,6 +1,7 @@
 import { ScrollView, View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useAuth } from '../../context/AuthContext';
 
 const features = [
   { route: '/calories', icon: '🥗', label: 'Calorie Tracker', desc: 'Log meals and track daily intake.', color: '#d1fae5', border: '#6ee7b7' },
@@ -11,12 +12,15 @@ const features = [
 
 export default function HomeScreen() {
   const router = useRouter();
+  const { user, signOut } = useAuth();
+
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
       <ScrollView contentContainerStyle={styles.scroll}>
         <View style={styles.hero}>
           <Text style={styles.heroTitle}>Welcome to FitTrack</Text>
           <Text style={styles.heroSub}>Track your nutrition and train with purpose.</Text>
+          {user && <Text style={styles.userEmail}>{user.email}</Text>}
         </View>
         <View style={styles.grid}>
           {features.map((f) => (
@@ -32,6 +36,10 @@ export default function HomeScreen() {
             </TouchableOpacity>
           ))}
         </View>
+
+        <TouchableOpacity style={styles.signOutBtn} onPress={signOut} activeOpacity={0.8}>
+          <Text style={styles.signOutText}>Sign Out</Text>
+        </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
   );
@@ -50,5 +58,8 @@ const styles = StyleSheet.create({
   },
   cardIcon: { fontSize: 32 },
   cardLabel: { fontSize: 16, fontWeight: '700', color: '#111827' },
-  cardDesc: { fontSize: 12, color: '#6b7280', lineHeight: 17 },
+  cardDesc:     { fontSize: 12, color: '#6b7280', lineHeight: 17 },
+  userEmail:    { fontSize: 12, color: '#9ca3af', marginTop: 6 },
+  signOutBtn:   { marginTop: 8, alignItems: 'center', paddingVertical: 14, backgroundColor: '#fee2e2', borderRadius: 12 },
+  signOutText:  { color: '#ef4444', fontWeight: '700', fontSize: 14 },
 });
