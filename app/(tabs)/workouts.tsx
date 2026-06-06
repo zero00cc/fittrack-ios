@@ -63,6 +63,23 @@ export default function WorkoutsScreen() {
   const [showPicker, setShowPicker] = useState(false);
   const [pickerSearch, setPickerSearch] = useState('');
 
+  // These must stay above any early return to satisfy Rules of Hooks
+  const dayExerciseIds = useMemo(() => {
+    if (!selectedDay) return new Set<string>();
+    const planIds = selectedDay.exercises.map((e) => `custom-${e.id}`);
+    const customIds = (workoutState.progress?.customExercises?.[selectedDay.dayNumber] ?? []).map((e) => e.id);
+    return new Set([...planIds, ...customIds]);
+  }, [selectedDay, workoutState.progress?.customExercises]);
+
+  const filteredLibrary = useMemo(() => {
+    const q = pickerSearch.toLowerCase();
+    return libraryExercises.filter(
+      (e) =>
+        e.name.toLowerCase().includes(q) ||
+        e.muscleGroups.some((m) => m.toLowerCase().includes(q)),
+    );
+  }, [pickerSearch]);
+
   if (!loaded) return <View style={styles.center}><Text style={styles.loading}>Loading…</Text></View>;
 
   const filteredPlans = workoutState.selectedLevel
@@ -122,22 +139,6 @@ export default function WorkoutsScreen() {
     else if (currentStatus === 'finished') updateDayStatus(dayNumber, 'unfinished');
   }
 
-  // IDs already in the selected day (plan + custom)
-  const dayExerciseIds = useMemo(() => {
-    if (!selectedDay) return new Set<string>();
-    const planIds = selectedDay.exercises.map((e) => `custom-${e.id}`);
-    const customIds = (workoutState.progress?.customExercises?.[selectedDay.dayNumber] ?? []).map((e) => e.id);
-    return new Set([...planIds, ...customIds]);
-  }, [selectedDay, workoutState.progress?.customExercises]);
-
-  const filteredLibrary = useMemo(() => {
-    const q = pickerSearch.toLowerCase();
-    return libraryExercises.filter(
-      (e) =>
-        e.name.toLowerCase().includes(q) ||
-        e.muscleGroups.some((m) => m.toLowerCase().includes(q)),
-    );
-  }, [pickerSearch]);
 
   // ── Level selector ──────────────────────────────────────────────
   if (view === 'level') {
