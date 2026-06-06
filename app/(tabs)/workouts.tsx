@@ -16,8 +16,10 @@ import {
   Exercise,
   SetBlock,
   PlanMode,
+  CompletedPlan,
 } from '../../types/workout.types';
-import { isoToDisplay } from '../../utils/dateUtils';
+import { isoToDisplay, todayYMD } from '../../utils/dateUtils';
+import { generateId } from '../../utils/calorieUtils';
 
 type DailyDateConfirm =
   | { type: 'add';    dateYMD: string; nextDay: WorkoutDay }
@@ -67,9 +69,11 @@ export default function WorkoutsScreen() {
     removeCustomExercise,
     resetDayProgress,
     resetPlan,
+    recordCompletedPlan,
   } = useWorkoutStore();
 
-  const [view, setView] = useState<'level' | 'plans' | 'setup' | 'detail'>('level');
+  const [view, setView] = useState<'level' | 'plans' | 'setup' | 'detail' | 'history'>('level');
+  const [completedRecord, setCompletedRecord] = useState<CompletedPlan | null>(null);
   const [selectedDay, setSelectedDay] = useState<WorkoutDay | null>(null);
   const [showPicker, setShowPicker] = useState(false);
   const [pickerSearch, setPickerSearch] = useState('');
@@ -170,6 +174,37 @@ export default function WorkoutsScreen() {
     setView('level');
   }
 
+  // Called after every status change; saves history and shows modal if plan is complete
+  function checkPlanCompletion(updatedStatus: Record<number, DayStatus>) {
+    if (!activePlan || !workoutState.progress) return;
+    const allDone = trainingDays.every((d) => {
+      const s = updatedStatus[d.dayNumber];
+      return s === 'finished' || s === 'skipped';
+    });
+    if (!allDone) return;
+
+    const finishedDays = trainingDays.filter((d) => updatedStatus[d.dayNumber] === 'finished').length;
+    const skippedDays  = trainingDays.filter((d) => updatedStatus[d.dayNumber] === 'skipped').length;
+    const record: CompletedPlan = {
+      id:            generateId(),
+      planId:        activePlan.id,
+      planName:      activePlan.name,
+      level:         activePlan.level,
+      startDate:     workoutState.progress.startDate,
+      completedDate: todayYMD(),
+      totalDays:     trainingDays.length,
+      finishedDays,
+      skippedDays,
+      dayResults:    trainingDays.map((d) => ({
+        dayNumber:      d.dayNumber,
+        label:          d.label,
+        status:         updatedStatus[d.dayNumber] ?? 'unfinished',
+        completionDate: workoutState.progress!.completionDates?.[d.dayNumber],
+      })),
+    };
+    setCompletedRecord(record);
+  }
+
   // Tap on an unlogged date in daily mode → confirm "Add?"
   function handleDailyDateTap(dateYMD: string) {
     const nextDay = trainingDays.find(
@@ -195,8 +230,13 @@ export default function WorkoutsScreen() {
     const updated = { ...existingProgress, [blockKey(exerciseId, blockIndex)]: newCount };
     const allDone = effectiveExercises.every((ex) => isExerciseDone(ex, updated));
     const currentStatus: DayStatus = workoutState.progress?.dayStatus[dayNumber] ?? 'unfinished';
-    if (allDone) updateDayStatus(dayNumber, 'finished', selectedWorkoutDate ?? undefined);
-    else if (currentStatus === 'finished') updateDayStatus(dayNumber, 'unfinished');
+    if (allDone) {
+      updateDayStatus(dayNumber, 'finished', selectedWorkoutDate ?? undefined);
+      const newStatus = { ...(workoutState.progress?.dayStatus ?? {}), [dayNumber]: 'finished' as DayStatus };
+      checkPlanCompletion(newStatus);
+    } else if (currentStatus === 'finished') {
+      updateDayStatus(dayNumber, 'unfinished');
+    }
   }
 
 
@@ -286,6 +326,58 @@ export default function WorkoutsScreen() {
     );
   }
 
+  // ── Plan history ───────────────────────────────────────────────
+  if (view === 'history') {
+    const history = workoutState.planHistory ?? [];
+    return (
+      <SafeAreaView style={styles.safe} edges={['bottom']}>
+        <ScrollView contentContainerStyle={styles.scroll}>
+          <TouchableOpacity onPress={() => setView('detail')} style={styles.backBtn}>
+            <Text style={styles.backBtnText}>← Back</Text>
+          </TouchableOpacity>
+          <Text style={styles.pageTitle}>Completed Plans</Text>
+          {history.length === 0 ? (
+            <View style={styles.emptyCard}>
+              <Text style={styles.emptyDesc}>No completed plans yet.</Text>
+            </View>
+          ) : (
+            history.map((record) => (
+              <View key={record.id} style={styles.historyCard}>
+                <View style={styles.historyCardHeader}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.historyPlanName}>{record.planName}</Text>
+                    <Text style={styles.historyDates}>
+                      {isoToDisplay(record.startDate)} → {isoToDisplay(record.completedDate)}
+                    </Text>
+                  </View>
+                  <View style={styles.historyBadge}>
+                    <Text style={styles.historyBadgeText}>
+                      {record.finishedDays}/{record.totalDays}
+                    </Text>
+                    <Text style={styles.historyBadgeLabel}>done</Text>
+                  </View>
+                </View>
+                <View style={styles.historyDayList}>
+                  {record.dayResults.map((dr) => (
+                    <View key={dr.dayNumber} style={styles.historyDayRow}>
+                      <Text style={[styles.historyDayStatus, { color: STATUS_COLORS[dr.status] }]}>
+                        {STATUS_LABELS[dr.status]}
+                      </Text>
+                      <Text style={styles.historyDayLabel} numberOfLines={1}>{dr.label}</Text>
+                      {dr.completionDate && (
+                        <Text style={styles.historyDayDate}>{isoToDisplay(dr.completionDate)}</Text>
+                      )}
+                    </View>
+                  ))}
+                </View>
+              </View>
+            ))
+          )}
+        </ScrollView>
+      </SafeAreaView>
+    );
+  }
+
   // ── Active plan detail ──────────────────────────────────────────
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
@@ -346,6 +438,12 @@ export default function WorkoutsScreen() {
                 </TouchableOpacity>
               );
             })}
+
+            {(workoutState.planHistory ?? []).length > 0 && (
+              <TouchableOpacity style={styles.historyLink} onPress={() => setView('history')}>
+                <Text style={styles.historyLinkText}>View Completed Plans ({workoutState.planHistory.length})</Text>
+              </TouchableOpacity>
+            )}
           </>
         )}
         {!activePlan && (
@@ -368,10 +466,11 @@ export default function WorkoutsScreen() {
               </TouchableOpacity>
               <Text style={styles.modalTitle} numberOfLines={1}>{selectedDay.label}</Text>
               <TouchableOpacity onPress={() => {
-                updateDayStatus(selectedDay.dayNumber, 'skipped', selectedWorkoutDate ?? undefined);
-                setSelectedDay(null);
-                setSelectedWorkoutDate(null);
-                setShowStopwatch(false);
+                const dn = selectedDay.dayNumber;
+                updateDayStatus(dn, 'skipped', selectedWorkoutDate ?? undefined);
+                setSelectedDay(null); setSelectedWorkoutDate(null); setShowStopwatch(false);
+                const newStatus = { ...(workoutState.progress?.dayStatus ?? {}), [dn]: 'skipped' as DayStatus };
+                checkPlanCompletion(newStatus);
               }}>
                 <Text style={styles.skipBtn}>Skip</Text>
               </TouchableOpacity>
@@ -403,10 +502,11 @@ export default function WorkoutsScreen() {
               <TouchableOpacity
                 style={styles.completeBtn}
                 onPress={() => {
-                  updateDayStatus(selectedDay.dayNumber, 'finished', selectedWorkoutDate ?? undefined);
-                  setSelectedDay(null);
-                  setSelectedWorkoutDate(null);
-                  setShowStopwatch(false);
+                  const dn = selectedDay.dayNumber;
+                  updateDayStatus(dn, 'finished', selectedWorkoutDate ?? undefined);
+                  setSelectedDay(null); setSelectedWorkoutDate(null); setShowStopwatch(false);
+                  const newStatus = { ...(workoutState.progress?.dayStatus ?? {}), [dn]: 'finished' as DayStatus };
+                  checkPlanCompletion(newStatus);
                 }}
               >
                 <Text style={styles.completeBtnText}>✓ Mark as Completed</Text>
@@ -498,6 +598,54 @@ export default function WorkoutsScreen() {
       )}
 
       {/* ── Daily date confirm modal ─────────────────────────────── */}
+      {/* ── Plan complete celebration modal ──────────────────────── */}
+      {completedRecord && (
+        <Modal visible transparent animationType="fade">
+          <View style={styles.celebrationOverlay}>
+            <View style={styles.celebrationCard}>
+              <Text style={styles.celebrationEmoji}>🎉</Text>
+              <Text style={styles.celebrationTitle}>Plan Complete!</Text>
+              <Text style={styles.celebrationPlan}>{completedRecord.planName}</Text>
+              <View style={styles.celebrationStats}>
+                <View style={styles.celebrationStat}>
+                  <Text style={styles.celebrationStatNum}>{completedRecord.finishedDays}</Text>
+                  <Text style={styles.celebrationStatLabel}>Done</Text>
+                </View>
+                <View style={styles.celebrationStat}>
+                  <Text style={[styles.celebrationStatNum, { color: '#f59e0b' }]}>{completedRecord.skippedDays}</Text>
+                  <Text style={styles.celebrationStatLabel}>Skipped</Text>
+                </View>
+                <View style={styles.celebrationStat}>
+                  <Text style={styles.celebrationStatNum}>{completedRecord.totalDays}</Text>
+                  <Text style={styles.celebrationStatLabel}>Total</Text>
+                </View>
+              </View>
+              <Text style={styles.celebrationSaved}>Saved to your history ✓</Text>
+              <TouchableOpacity
+                style={styles.celebrationBtn}
+                onPress={() => {
+                  recordCompletedPlan(completedRecord);
+                  setCompletedRecord(null);
+                  setView('level');
+                }}
+              >
+                <Text style={styles.celebrationBtnText}>Start a New Plan</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.celebrationSecondary}
+                onPress={() => {
+                  recordCompletedPlan(completedRecord);
+                  setCompletedRecord(null);
+                  setView('history');
+                }}
+              >
+                <Text style={styles.celebrationSecondaryText}>View History</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+      )}
+
       {dailyDateConfirm && (
         <Modal visible transparent animationType="fade">
           <TouchableOpacity
@@ -657,4 +805,35 @@ const styles = StyleSheet.create({
   pickerAdd: { color: '#10b981', fontSize: 13, fontWeight: '700', paddingLeft: 12 },
   pickerRemove: { color: '#ef4444', fontSize: 13, fontWeight: '700', paddingLeft: 12 },
   pickerEmpty: { textAlign: 'center', color: '#9ca3af', fontSize: 13, marginTop: 32 },
+  // History link button
+  historyLink: { marginTop: 8, paddingVertical: 12, alignItems: 'center' },
+  historyLinkText: { color: '#6366f1', fontSize: 13, fontWeight: '600' },
+  // History view
+  historyCard: { backgroundColor: '#fff', borderRadius: 16, padding: 16, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 8, shadowOffset: { width: 0, height: 2 } },
+  historyCardHeader: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 12 },
+  historyPlanName: { fontSize: 15, fontWeight: '700', color: '#111827' },
+  historyDates: { fontSize: 12, color: '#9ca3af', marginTop: 2 },
+  historyBadge: { alignItems: 'center', backgroundColor: '#ecfdf5', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 6 },
+  historyBadgeText: { fontSize: 18, fontWeight: '800', color: '#10b981' },
+  historyBadgeLabel: { fontSize: 10, color: '#6b7280' },
+  historyDayList: { gap: 6 },
+  historyDayRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  historyDayStatus: { fontSize: 11, fontWeight: '700', width: 60 },
+  historyDayLabel: { flex: 1, fontSize: 12, color: '#374151' },
+  historyDayDate: { fontSize: 11, color: '#9ca3af' },
+  // Celebration modal
+  celebrationOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center', padding: 32 },
+  celebrationCard: { width: '100%', backgroundColor: '#fff', borderRadius: 24, padding: 28, alignItems: 'center', gap: 8 },
+  celebrationEmoji: { fontSize: 56 },
+  celebrationTitle: { fontSize: 24, fontWeight: '800', color: '#111827' },
+  celebrationPlan: { fontSize: 15, color: '#6b7280', textAlign: 'center' },
+  celebrationStats: { flexDirection: 'row', gap: 24, marginVertical: 8 },
+  celebrationStat: { alignItems: 'center' },
+  celebrationStatNum: { fontSize: 28, fontWeight: '800', color: '#10b981' },
+  celebrationStatLabel: { fontSize: 11, color: '#9ca3af', marginTop: 2 },
+  celebrationSaved: { fontSize: 12, color: '#10b981', fontWeight: '600' },
+  celebrationBtn: { width: '100%', backgroundColor: '#10b981', borderRadius: 14, paddingVertical: 15, alignItems: 'center', marginTop: 8 },
+  celebrationBtnText: { color: '#fff', fontWeight: '700', fontSize: 16 },
+  celebrationSecondary: { width: '100%', paddingVertical: 12, alignItems: 'center' },
+  celebrationSecondaryText: { color: '#6366f1', fontWeight: '600', fontSize: 14 },
 });

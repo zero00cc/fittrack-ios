@@ -65,8 +65,29 @@ export interface PlanProgress {
   completionDates?: { [dayNumber: number]: string };
 }
 
+export interface CompletedPlanDay {
+  dayNumber: number;
+  label: string;
+  status: DayStatus;
+  completionDate?: string; // YYYY-MM-DD
+}
+
+export interface CompletedPlan {
+  id: string;
+  planId: string;
+  planName: string;
+  level: TrainingLevel;
+  startDate: string;      // YYYY-MM-DD
+  completedDate: string;  // YYYY-MM-DD — date the last day was marked
+  totalDays: number;      // training days only (no rest days)
+  finishedDays: number;
+  skippedDays: number;
+  dayResults: CompletedPlanDay[];
+}
+
 export interface WorkoutState {
   selectedLevel: TrainingLevel | null;
   activePlanId: string | null;
   progress: PlanProgress | null;
+  planHistory: CompletedPlan[];
 }

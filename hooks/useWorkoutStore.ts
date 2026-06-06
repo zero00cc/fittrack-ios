@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { useAsyncStorage } from './useAsyncStorage';
-import { WorkoutState, TrainingLevel, DayStatus, SetBlock, Exercise, PlanMode } from '../types/workout.types';
+import { WorkoutState, TrainingLevel, DayStatus, SetBlock, Exercise, PlanMode, CompletedPlan } from '../types/workout.types';
 import { todayYMD } from '../utils/dateUtils';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
@@ -11,6 +11,7 @@ const defaultState: WorkoutState = {
   selectedLevel: null,
   activePlanId:  null,
   progress:      null,
+  planHistory:   [],
 };
 
 export function useWorkoutStore() {
@@ -186,6 +187,18 @@ export function useWorkoutStore() {
     [setWorkoutState],
   );
 
+  // Save a completed plan to history then clear the active plan
+  const recordCompletedPlan = useCallback(
+    (record: CompletedPlan) =>
+      setWorkoutState((prev) => ({
+        ...prev,
+        activePlanId: null,
+        progress:     null,
+        planHistory:  [record, ...(prev.planHistory ?? [])],
+      })),
+    [setWorkoutState],
+  );
+
   return {
     workoutState,
     loaded,
@@ -198,5 +211,6 @@ export function useWorkoutStore() {
     removeCustomExercise,
     resetDayProgress,
     resetPlan,
+    recordCompletedPlan,
   };
 }
