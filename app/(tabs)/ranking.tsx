@@ -4,6 +4,7 @@ import {
   StyleSheet, ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { router } from 'expo-router';
 import { useWorkoutStore } from '../../hooks/useWorkoutStore';
 import { useLeaderboard } from '../../hooks/useLeaderboard';
 import { useAuth } from '../../context/AuthContext';
@@ -62,6 +63,9 @@ export default function RankingScreen() {
   if (!isUnlocked) {
     return (
       <SafeAreaView style={styles.safe} edges={['bottom']}>
+        <TouchableOpacity onPress={() => router.push('/(tabs)')} style={styles.backBtn}>
+          <Text style={styles.backBtnText}>← Home</Text>
+        </TouchableOpacity>
         <View style={styles.lockedContainer}>
           <Text style={styles.lockedIcon}>🔒</Text>
           <Text style={styles.lockedTitle}>Ranking Locked</Text>
@@ -197,6 +201,9 @@ export default function RankingScreen() {
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
       <ScrollView contentContainerStyle={styles.scroll}>
+        <TouchableOpacity onPress={() => router.push('/(tabs)')} style={styles.backBtn}>
+          <Text style={styles.backBtnText}>← Home</Text>
+        </TouchableOpacity>
         <Text style={styles.pageTitle}>Leaderboard</Text>
 
         {/* My stats card */}
