@@ -16,14 +16,27 @@ const defaultState: WorkoutState = {
 
 export function useWorkoutStore() {
   const { user } = useAuth();
-  const userRef = useRef(user);
-  userRef.current = user;
+  const userRef          = useRef(user);
+  userRef.current        = user;
 
   const [workoutState, setWorkoutState, loaded] = useAsyncStorage<WorkoutState>(WORKOUT_KEY, defaultState);
+
+  // Always holds the latest workoutState so async callbacks can read it without stale closures
+  const workoutStateRef  = useRef(workoutState);
+  workoutStateRef.current = workoutState;
 
   // Guards for the reactive push effect
   const remoteFetched  = useRef(false); // true once the Supabase fetch has returned
   const skipNextPush   = useRef(false); // true when a change came from the remote load
+
+  function pushState(state: WorkoutState) {
+    const u = userRef.current;
+    if (!u) return;
+    void supabase.from('workout_state').upsert(
+      { user_id: u.id, data: state, updated_at: new Date().toISOString() },
+      { onConflict: 'user_id' },
+    ).then(undefined, () => {});
+  }
 
   // ── Pull from Supabase when the user signs in ──────────────────
   useEffect(() => {
@@ -37,8 +50,12 @@ export function useWorkoutStore() {
       .then(({ data }) => {
         remoteFetched.current = true;
         if (data?.data) {
-          skipNextPush.current = true;          // the next workoutState change is from us — don't echo it back
+          skipNextPush.current = true; // don't echo the remote load back
           setWorkoutState(data.data as WorkoutState);
+        } else {
+          // No remote row yet — push local state immediately so it gets saved.
+          // The reactive effect below won't fire because workoutState didn't change.
+          pushState(workoutStateRef.current);
         }
       });
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -55,13 +72,7 @@ export function useWorkoutStore() {
       return;
     }
 
-    const u = userRef.current;
-    if (!u) return;
-
-    void supabase.from('workout_state').upsert(
-      { user_id: u.id, data: workoutState, updated_at: new Date().toISOString() },
-      { onConflict: 'user_id' },
-    ).then(undefined, () => {});
+    pushState(workoutState);
   }, [workoutState, loaded]);
 
   // ── Actions — all use functional updaters (stale-closure safe) ──
