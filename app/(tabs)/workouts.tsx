@@ -82,6 +82,8 @@ export default function WorkoutsScreen() {
   const [confirmReset, setConfirmReset] = useState(false);
   // The calendar date the user tapped in daily mode (used as the workout's completion date)
   const [selectedWorkoutDate, setSelectedWorkoutDate] = useState<string | null>(null);
+  // Remembers the chosen date per day so reopening a day doesn't require re-selecting from the calendar
+  const [pendingDayDates, setPendingDayDates] = useState<Record<number, string>>({});
   const [dailyDateConfirm, setDailyDateConfirm] = useState<DailyDateConfirm | null>(null);
   const [showStopwatch, setShowStopwatch] = useState(false);
 
@@ -171,6 +173,7 @@ export default function WorkoutsScreen() {
   function doReset() {
     setConfirmReset(false);
     resetPlan();
+    setPendingDayDates({});
     setView('level');
   }
 
@@ -462,7 +465,7 @@ export default function WorkoutsScreen() {
             {trainingDays.map((day) => {
               const status: DayStatus = workoutState.progress?.dayStatus[day.dayNumber] ?? 'unfinished';
               return (
-                <TouchableOpacity key={day.dayNumber} style={styles.dayRow} onPress={() => setSelectedDay(day)} activeOpacity={0.7}>
+                <TouchableOpacity key={day.dayNumber} style={styles.dayRow} onPress={() => { setSelectedDay(day); setSelectedWorkoutDate(pendingDayDates[day.dayNumber] ?? null); }} activeOpacity={0.7}>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.dayLabel}>{day.label}</Text>
                     <Text style={styles.dayExCount}>{totalExerciseCount(day)} exercises</Text>
@@ -502,6 +505,7 @@ export default function WorkoutsScreen() {
                 const dn = selectedDay.dayNumber;
                 updateDayStatus(dn, 'skipped', selectedWorkoutDate ?? undefined);
                 setSelectedDay(null); setSelectedWorkoutDate(null); setShowStopwatch(false);
+                setPendingDayDates((prev) => { const n = { ...prev }; delete n[dn]; return n; });
                 const newStatus = { ...(workoutState.progress?.dayStatus ?? {}), [dn]: 'skipped' as DayStatus };
                 checkPlanCompletion(newStatus, { dayNumber: dn, date: undefined });
               }}>
@@ -538,6 +542,7 @@ export default function WorkoutsScreen() {
                   const dn = selectedDay.dayNumber;
                   updateDayStatus(dn, 'finished', selectedWorkoutDate ?? undefined);
                   setSelectedDay(null); setSelectedWorkoutDate(null); setShowStopwatch(false);
+                  setPendingDayDates((prev) => { const n = { ...prev }; delete n[dn]; return n; });
                   const newStatus = { ...(workoutState.progress?.dayStatus ?? {}), [dn]: 'finished' as DayStatus };
                   checkPlanCompletion(newStatus, { dayNumber: dn, date: selectedWorkoutDate ?? undefined });
                 }}
@@ -546,7 +551,7 @@ export default function WorkoutsScreen() {
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.resetDayBtn}
-                onPress={() => { updateDayStatus(selectedDay.dayNumber, 'unfinished'); setSelectedDay(null); setSelectedWorkoutDate(null); }}
+                onPress={() => { const dn = selectedDay.dayNumber; updateDayStatus(dn, 'unfinished'); setSelectedDay(null); setSelectedWorkoutDate(null); setPendingDayDates((prev) => { const n = { ...prev }; delete n[dn]; return n; }); }}
               >
                 <Text style={styles.resetDayBtnText}>Reset Day</Text>
               </TouchableOpacity>
@@ -715,6 +720,7 @@ export default function WorkoutsScreen() {
                     onPress={() => {
                       const { dateYMD, nextDay } = dailyDateConfirm;
                       setDailyDateConfirm(null);
+                      setPendingDayDates((prev) => ({ ...prev, [nextDay.dayNumber]: dateYMD }));
                       setSelectedWorkoutDate(dateYMD);
                       setSelectedDay(nextDay);
                     }}
