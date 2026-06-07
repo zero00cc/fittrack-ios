@@ -317,7 +317,7 @@ const styles = StyleSheet.create({
   lockedIcon:      { fontSize: 56, marginBottom: 16 },
   lockedTitle:     { fontSize: 22, fontWeight: '800', color: '#111827', textAlign: 'center' },
   lockedDesc:      { fontSize: 14, color: '#6b7280', textAlign: 'center', marginTop: 8, lineHeight: 21 },
-  backBtn:         { marginBottom: 4 },
+  backBtn:         { alignSelf: 'flex-end', marginBottom: 4 },
   backBtnText:     { color: '#10b981', fontSize: 14, fontWeight: '600' },
   pageTitle:       { fontSize: 22, fontWeight: '800', color: '#111827' },
   pageSubtitle:    { fontSize: 13, color: '#6b7280', lineHeight: 19 },
