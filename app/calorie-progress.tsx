@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, Modal,
-  StyleSheet, Dimensions, Alert, TextInput,
+  StyleSheet, Alert, TextInput,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useCalorieStore } from '../hooks/useCalorieStore';
@@ -9,85 +9,161 @@ import { dayTotals, calorieColor } from '../utils/calorieUtils';
 import { getLast30Days, formatShortDate, toYMD } from '../utils/dateUtils';
 import { MacroEntry } from '../types/calorie.types';
 
-const SCREEN_W = Dimensions.get('window').width;
+// ── Chart helpers ─────────────────────────────────────────────────────────────
 
-// ── 30-day bar chart (fixed layout) ──────────────────────────────────────────
+function niceStep(max: number, targetTicks: number): number {
+  const rough = max / targetTicks;
+  const mag   = Math.pow(10, Math.floor(Math.log10(rough)));
+  const n     = rough / mag;
+  const nice  = n < 1.5 ? 1 : n < 3 ? 2 : n < 7 ? 5 : 10;
+  return nice * mag;
+}
+
+function fmtTick(v: number): string {
+  if (v === 0) return '0';
+  if (v >= 1000) return `${+(v / 1000).toFixed(1)}k`;
+  return String(v);
+}
+
+// ── 30-day bar chart ──────────────────────────────────────────────────────────
+
+const CHART_H  = 160;   // px — bar area height
+const LABEL_H  = 22;    // px — x-axis label row
+const BAR_W    = 18;    // px — bar width
+const BAR_SLOT = 26;    // px — slot width (bar + gap)
+const Y_W      = 42;    // px — y-axis panel width
 
 function BarChart({ history, goals }: { history: any; goals: any }) {
-  const CHART_H  = 130;
-  const LABEL_H  = 20;
-  const days     = getLast30Days();
-  const values   = days.map((d) => dayTotals(history[d]).calories);
-  const maxVal   = Math.max(goals.calories * 1.35, ...values, 1);
-  // Fixed bar width so all 30 fit on screen without scrolling
-  const barW     = Math.floor((SCREEN_W - 48) / days.length) - 1;
+  const days   = getLast30Days();
+  const values = days.map((d) => dayTotals(history[d]).calories);
+  const maxVal = Math.max(goals.calories * 1.3, ...values, 100);
+
+  // Y-axis ticks
+  const step   = niceStep(maxVal, 4);
+  const yTicks = Array.from({ length: Math.floor(maxVal / step) + 1 }, (_, i) => i * step);
+  const chartW = days.length * BAR_SLOT;
 
   return (
     <View style={bc.wrap}>
       <Text style={bc.title}>Last 30 Days</Text>
-      {/* Bar area with target line overlay */}
-      <View style={{ height: CHART_H, position: 'relative' }}>
-        {/* Target line — correctly positioned within bar area */}
-        <View style={[bc.targetLine, { bottom: Math.min(CHART_H - 1, (goals.calories / maxVal) * CHART_H) }]} />
-        {/* Bars */}
-        <View style={{ flexDirection: 'row', alignItems: 'flex-end', height: CHART_H, gap: 1 }}>
-          {days.map((date, i) => {
-            const val     = values[i];
-            const h       = val > 0 ? Math.max(4, Math.round((val / maxVal) * CHART_H)) : 3;
-            const color   = calorieColor(val, goals.calories);
-            const isToday = i === days.length - 1;
-            return (
-              <View
-                key={date}
-                style={[
-                  bc.bar,
-                  {
-                    width:           barW,
-                    height:          h,
-                    backgroundColor: val > 0 ? color : '#1e293b',
-                    borderWidth:     isToday ? 1.5 : 0,
-                    borderColor:     '#f1f5f9',
-                  },
-                ]}
-              />
-            );
-          })}
+
+      <View style={{ flexDirection: 'row' }}>
+        {/* ── Y-axis ── */}
+        <View style={{ width: Y_W, height: CHART_H, position: 'relative' }}>
+          {yTicks.map((v) => (
+            <Text
+              key={v}
+              style={[bc.yLabel, { bottom: (v / maxVal) * CHART_H - 7 }]}
+            >
+              {fmtTick(v)}
+            </Text>
+          ))}
         </View>
-      </View>
-      {/* Label row — completely separate, no height interference with bars */}
-      <View style={{ flexDirection: 'row', gap: 1, marginTop: 4 }}>
-        {days.map((date, i) => (
-          <View key={date} style={{ width: barW, alignItems: 'center' }}>
-            {(i === 0 || i % 7 === 0 || i === days.length - 1) && (
-              <Text style={bc.label} numberOfLines={1}>
-                {formatShortDate(date).replace(/\s\d{4}/, '').trim()}
-              </Text>
-            )}
+
+        {/* ── Scrollable chart ── */}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1 }}>
+          <View style={{ width: chartW, height: CHART_H + LABEL_H, position: 'relative' }}>
+
+            {/* Gridlines */}
+            {yTicks.map((v) => (
+              <View
+                key={v}
+                style={[bc.gridLine, { bottom: LABEL_H + (v / maxVal) * CHART_H, width: chartW }]}
+              />
+            ))}
+
+            {/* Goal / target line */}
+            <View
+              style={[
+                bc.targetLine,
+                { bottom: LABEL_H + Math.min(CHART_H - 1, (goals.calories / maxVal) * CHART_H), width: chartW },
+              ]}
+            />
+
+            {/* Bars */}
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems:   'flex-end',
+                position:     'absolute',
+                bottom:       LABEL_H,
+                left:         0,
+                height:       CHART_H,
+              }}
+            >
+              {days.map((date, i) => {
+                const val     = values[i];
+                const h       = val > 0 ? Math.max(4, Math.round((val / maxVal) * CHART_H)) : 3;
+                const color   = calorieColor(val, goals.calories);
+                const isToday = i === days.length - 1;
+                return (
+                  <View key={date} style={{ width: BAR_SLOT, alignItems: 'center' }}>
+                    <View
+                      style={[
+                        bc.bar,
+                        {
+                          width:           BAR_W,
+                          height:          h,
+                          backgroundColor: val > 0 ? color : '#0f172a',
+                          borderWidth:     isToday ? 1.5 : 0,
+                          borderColor:     '#f1f5f9',
+                        },
+                      ]}
+                    />
+                  </View>
+                );
+              })}
+            </View>
+
+            {/* X-axis labels — every 5 days + today */}
+            <View style={{ flexDirection: 'row', position: 'absolute', bottom: 0, left: 0, height: LABEL_H }}>
+              {days.map((date, i) => {
+                const show = i === 0 || i % 5 === 0 || i === days.length - 1;
+                return (
+                  <View key={date} style={{ width: BAR_SLOT, alignItems: 'center', justifyContent: 'flex-end', paddingBottom: 2 }}>
+                    {show && (
+                      <Text style={bc.xLabel} numberOfLines={1}>
+                        {formatShortDate(date).replace(/\s\d{4}/, '').trim()}
+                      </Text>
+                    )}
+                  </View>
+                );
+              })}
+            </View>
           </View>
-        ))}
+        </ScrollView>
       </View>
+
       {/* Legend */}
       <View style={bc.legend}>
-        {[['#3b82f6','Under'], ['#22c55e','On track'], ['#ef4444','Over']].map(([c, l]) => (
+        {([['#3b82f6', 'Under'], ['#22c55e', 'On track'], ['#ef4444', 'Over']] as const).map(([c, l]) => (
           <View key={l} style={bc.legendItem}>
             <View style={[bc.dot, { backgroundColor: c }]} />
             <Text style={bc.legendTxt}>{l}</Text>
           </View>
         ))}
+        <View style={bc.legendItem}>
+          <View style={bc.targetSwatch} />
+          <Text style={bc.legendTxt}>Goal</Text>
+        </View>
       </View>
     </View>
   );
 }
+
 const bc = StyleSheet.create({
-  wrap:       { backgroundColor: '#1e293b', borderRadius: 20, padding: 16, gap: 10 },
-  title:      { fontSize: 14, fontWeight: '700', color: '#f1f5f9' },
-  bar:        { borderRadius: 3 },
-  targetLine: { position: 'absolute', left: 0, right: 0, height: 1, borderTopWidth: 1, borderTopColor: '#10b981', borderStyle: 'dashed', opacity: 0.7 },
-  label:      { fontSize: 7, color: '#475569', textAlign: 'center' },
-  legend:     { flexDirection: 'row', justifyContent: 'center', gap: 16, marginTop: 2 },
-  legendItem: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  dot:        { width: 8, height: 8, borderRadius: 4 },
-  legendTxt:  { fontSize: 10, color: '#64748b' },
+  wrap:        { backgroundColor: '#1e293b', borderRadius: 20, padding: 16, gap: 12 },
+  title:       { fontSize: 14, fontWeight: '700', color: '#f1f5f9' },
+  yLabel:      { position: 'absolute', right: 4, fontSize: 9, color: '#475569', fontWeight: '600' },
+  gridLine:    { position: 'absolute', left: 0, height: 1, backgroundColor: '#334155', opacity: 0.4 },
+  targetLine:  { position: 'absolute', left: 0, height: 1, borderTopWidth: 1, borderTopColor: '#10b981', borderStyle: 'dashed', opacity: 0.8 },
+  bar:         { borderRadius: 4 },
+  xLabel:      { fontSize: 9, color: '#64748b', textAlign: 'center' },
+  legend:      { flexDirection: 'row', justifyContent: 'center', gap: 14, flexWrap: 'wrap' },
+  legendItem:  { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  dot:         { width: 8, height: 8, borderRadius: 4 },
+  targetSwatch:{ width: 14, height: 2, backgroundColor: '#10b981', borderRadius: 1 },
+  legendTxt:   { fontSize: 10, color: '#64748b' },
 });
 
 // ── Calendar ──────────────────────────────────────────────────────────────────
@@ -100,22 +176,20 @@ function CalendarView({ history, goals, onDayPress }: {
   const [month, setMonth] = useState(todayDate.getMonth());
 
   const isCurrentMonth = year === todayDate.getFullYear() && month === todayDate.getMonth();
-
   function prev() { if (month === 0) { setMonth(11); setYear(y => y - 1); } else setMonth(m => m - 1); }
   function next() {
     if (isCurrentMonth) return;
     if (month === 11) { setMonth(0); setYear(y => y + 1); } else setMonth(m => m + 1);
   }
 
-  const firstDay   = new Date(year, month, 1).getDay();
-  const daysInMon  = new Date(year, month + 1, 0).getDate();
+  const firstDay  = new Date(year, month, 1).getDay();
+  const daysInMon = new Date(year, month + 1, 0).getDate();
+  const todayStr  = toYMD(todayDate);
   const monthLabel = new Date(year, month).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-  const todayStr   = toYMD(todayDate);
 
   const cells: (string | null)[] = Array(firstDay).fill(null);
-  for (let d = 1; d <= daysInMon; d++) {
+  for (let d = 1; d <= daysInMon; d++)
     cells.push(`${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`);
-  }
 
   return (
     <View style={cal.wrap}>
@@ -133,14 +207,12 @@ function CalendarView({ history, goals, onDayPress }: {
         {cells.map((date, i) => {
           if (!date) return <View key={`e${i}`} style={cal.cell} />;
           const log     = history[date];
-          const total   = dayTotals(log).calories;
           const hasData = log && log.entries.length > 0;
-          const color   = hasData ? calorieColor(total, goals.calories) : null;
+          const color   = hasData ? calorieColor(dayTotals(log).calories, goals.calories) : null;
           const isToday = date === todayStr;
-          const day     = parseInt(date.slice(8));
           return (
             <TouchableOpacity key={date} style={[cal.cell, isToday && cal.cellToday]} onPress={() => onDayPress(date)}>
-              <Text style={[cal.cellTxt, isToday && cal.cellTxtToday]}>{day}</Text>
+              <Text style={[cal.cellTxt, isToday && cal.cellTxtToday]}>{parseInt(date.slice(8))}</Text>
               {color && <View style={[cal.cellDot, { backgroundColor: color }]} />}
             </TouchableOpacity>
           );
@@ -150,34 +222,34 @@ function CalendarView({ history, goals, onDayPress }: {
   );
 }
 const cal = StyleSheet.create({
-  wrap:       { backgroundColor: '#1e293b', borderRadius: 20, padding: 16, gap: 12 },
-  nav:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  navBtn:     { padding: 8 },
-  navBtnOff:  { opacity: 0.25 },
-  navTxt:     { fontSize: 24, color: '#f1f5f9', fontWeight: '700' },
-  monthTxt:   { fontSize: 15, fontWeight: '700', color: '#f1f5f9' },
-  dayLabels:  { flexDirection: 'row' },
-  dayLabel:   { flex: 1, textAlign: 'center', fontSize: 10, color: '#475569', fontWeight: '600' },
-  grid:       { flexDirection: 'row', flexWrap: 'wrap' },
-  cell:       { width: `${100 / 7}%`, aspectRatio: 1, alignItems: 'center', justifyContent: 'center', gap: 2 },
-  cellToday:  { backgroundColor: '#0f172a', borderRadius: 8 },
-  cellTxt:    { fontSize: 13, color: '#64748b' },
-  cellTxtToday:{ color: '#f1f5f9', fontWeight: '700' },
-  cellDot:    { width: 5, height: 5, borderRadius: 3 },
+  wrap:         { backgroundColor: '#1e293b', borderRadius: 20, padding: 16, gap: 12 },
+  nav:          { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  navBtn:       { padding: 8 },
+  navBtnOff:    { opacity: 0.25 },
+  navTxt:       { fontSize: 24, color: '#f1f5f9', fontWeight: '700' },
+  monthTxt:     { fontSize: 15, fontWeight: '700', color: '#f1f5f9' },
+  dayLabels:    { flexDirection: 'row' },
+  dayLabel:     { flex: 1, textAlign: 'center', fontSize: 10, color: '#475569', fontWeight: '600' },
+  grid:         { flexDirection: 'row', flexWrap: 'wrap' },
+  cell:         { width: `${100 / 7}%`, aspectRatio: 1, alignItems: 'center', justifyContent: 'center', gap: 2 },
+  cellToday:    { backgroundColor: '#0f172a', borderRadius: 8 },
+  cellTxt:      { fontSize: 13, color: '#64748b' },
+  cellTxtToday: { color: '#f1f5f9', fontWeight: '700' },
+  cellDot:      { width: 5, height: 5, borderRadius: 3 },
 });
 
-// ── Edit entry modal (for history entries) ────────────────────────────────────
+// ── Edit entry form (inside day modal) ────────────────────────────────────────
 
 function EditHistoryEntry({ entry, date, onSave, onClose }: {
   entry: MacroEntry; date: string;
   onSave: (d: string, id: string, u: any) => void;
   onClose: () => void;
 }) {
-  const [name, setName]   = useState(entry.name);
-  const [cal, setCal]     = useState(String(entry.calories));
-  const [pro, setPro]     = useState(String(entry.protein));
-  const [carb, setCarb]   = useState(String(entry.carbs));
-  const [fat, setFat]     = useState(String(entry.fat));
+  const [name, setName] = useState(entry.name);
+  const [cal, setCal]   = useState(String(entry.calories));
+  const [pro, setPro]   = useState(String(entry.protein));
+  const [carb, setCarb] = useState(String(entry.carbs));
+  const [fat, setFat]   = useState(String(entry.fat));
 
   return (
     <View style={ee.wrap}>
@@ -187,10 +259,10 @@ function EditHistoryEntry({ entry, date, onSave, onClose }: {
       </View>
       <TextInput style={ee.nameInput} value={name} onChangeText={setName} placeholderTextColor="#475569" />
       <View style={ee.macroRow}>
-        {[['Cal','kcal',cal,setCal],['Prot','g',pro,setPro],['Carb','g',carb,setCarb],['Fat','g',fat,setFat]].map(([l,u,v,s]: any) => (
+        {[['Cal','kcal',cal,setCal],['Prot','g',pro,setPro],['Carb','g',carb,setCarb],['Fat','g',fat,setFat]].map(([l,u,v,sv]: any) => (
           <View key={l} style={ee.field}>
             <Text style={ee.fieldLabel}>{l}</Text>
-            <TextInput style={ee.fieldInput} value={v} onChangeText={s} keyboardType="numeric" selectTextOnFocus />
+            <TextInput style={ee.fieldInput} value={v} onChangeText={sv} keyboardType="numeric" selectTextOnFocus />
             <Text style={ee.fieldUnit}>{u}</Text>
           </View>
         ))}
@@ -219,7 +291,7 @@ const ee = StyleSheet.create({
   saveTxt:    { color: '#fff', fontWeight: '700', fontSize: 15 },
 });
 
-// ── Day detail popup modal ────────────────────────────────────────────────────
+// ── Day detail modal — CENTERED ───────────────────────────────────────────────
 
 function DayModal({ date, history, goals, updateEntry, removeHistoryEntry, onClose }: {
   date: string; history: any; goals: any;
@@ -233,17 +305,13 @@ function DayModal({ date, history, goals, updateEntry, removeHistoryEntry, onClo
   const color  = calorieColor(totals.calories, goals.calories);
   const label  = new Date(date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
 
-  function confirmDelete(entry: MacroEntry) {
-    Alert.alert('Delete entry?', entry.name, [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: () => removeHistoryEntry(date, entry.id) },
-    ]);
-  }
-
   return (
-    <Modal visible animationType="slide" transparent>
-      <View style={dm.overlay}>
-        <View style={dm.sheet}>
+    <Modal visible animationType="fade" transparent>
+      {/* Full-screen backdrop — tap outside to dismiss */}
+      <TouchableOpacity style={dm.backdrop} activeOpacity={1} onPress={onClose}>
+        {/* Stop propagation so tapping inside the card doesn't close */}
+        <TouchableOpacity activeOpacity={1} style={dm.card} onPress={() => {}}>
+
           {/* Header */}
           <View style={dm.header}>
             <View style={{ flex: 1 }}>
@@ -256,7 +324,11 @@ function DayModal({ date, history, goals, updateEntry, removeHistoryEntry, onClo
             </TouchableOpacity>
           </View>
 
-          <ScrollView style={{ maxHeight: 400 }} showsVerticalScrollIndicator={false}>
+          {/* Divider */}
+          <View style={dm.divider} />
+
+          {/* Content */}
+          <ScrollView style={{ maxHeight: 320 }} showsVerticalScrollIndicator={false}>
             {!log || log.entries.length === 0 ? (
               <Text style={dm.empty}>No meals logged this day.</Text>
             ) : editingEntry ? (
@@ -273,40 +345,43 @@ function DayModal({ date, history, goals, updateEntry, removeHistoryEntry, onClo
                     <Text style={dm.rowName} numberOfLines={1}>{entry.name}</Text>
                     <Text style={dm.rowMacros}>P {entry.protein}g · C {entry.carbs}g · F {entry.fat}g</Text>
                   </View>
-                  <Text style={dm.rowKcal}>{entry.calories}</Text>
+                  <Text style={dm.rowKcal}>{entry.calories} kcal</Text>
                   <TouchableOpacity onPress={() => setEditing(entry)} style={dm.actionBtn}>
                     <Text style={dm.editTxt}>✎</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity onPress={() => confirmDelete(entry)} style={dm.actionBtn}>
-                    <Text style={dm.delTxt}>✕</Text>
+                  <TouchableOpacity onPress={() => removeHistoryEntry(date, entry.id)} style={dm.actionBtn}>
+                    <Text style={dm.delTxt}>🗑</Text>
                   </TouchableOpacity>
                 </View>
               ))
             )}
           </ScrollView>
-        </View>
-      </View>
+
+        </TouchableOpacity>
+      </TouchableOpacity>
     </Modal>
   );
 }
+
 const dm = StyleSheet.create({
-  overlay:   { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
-  sheet:     { backgroundColor: '#1e293b', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, gap: 12, paddingBottom: 36 },
+  backdrop:  { flex: 1, backgroundColor: 'rgba(0,0,0,0.65)', justifyContent: 'center', alignItems: 'center', padding: 24 },
+  card:      { backgroundColor: '#1e293b', borderRadius: 20, padding: 20, width: '100%', gap: 12 },
   header:    { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
-  date:      { fontSize: 14, fontWeight: '700', color: '#f1f5f9' },
-  kcal:      { fontSize: 28, fontWeight: '900', marginTop: 2 },
+  date:      { fontSize: 13, fontWeight: '600', color: '#94a3b8' },
+  kcal:      { fontSize: 28, fontWeight: '900', marginTop: 4 },
   macros:    { fontSize: 12, color: '#64748b', marginTop: 2 },
-  closeBtn:  { padding: 6 },
+  closeBtn:  { padding: 4 },
   closeTxt:  { color: '#475569', fontSize: 20 },
+  divider:   { height: 1, backgroundColor: '#0f172a' },
   empty:     { fontSize: 14, color: '#475569', textAlign: 'center', paddingVertical: 24 },
   row:       { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#0f172a', gap: 8 },
   rowInfo:   { flex: 1 },
   rowName:   { fontSize: 14, fontWeight: '600', color: '#f1f5f9' },
   rowMacros: { fontSize: 11, color: '#64748b', marginTop: 2 },
-  rowKcal:   { fontSize: 14, fontWeight: '800', color: '#10b981' },
+  rowKcal:   { fontSize: 13, fontWeight: '800', color: '#10b981' },
   actionBtn: { padding: 6 },
   editTxt:   { color: '#64748b', fontSize: 16 },
-  delTxt:    { color: '#475569', fontSize: 16 },
+  delTxt:    { fontSize: 15 },
 });
 
 // ── Main screen ───────────────────────────────────────────────────────────────
@@ -316,11 +391,7 @@ export default function CalorieProgressScreen() {
   const [modalDate, setModalDate] = useState<string | null>(null);
 
   if (!loaded) {
-    return (
-      <View style={s.loading}>
-        <Text style={s.loadingTxt}>Loading…</Text>
-      </View>
-    );
+    return <View style={s.loading}><Text style={s.loadingTxt}>Loading…</Text></View>;
   }
 
   const days30   = getLast30Days();
@@ -340,21 +411,14 @@ export default function CalorieProgressScreen() {
           <View style={s.chip}><Text style={s.chipNum}>{goals.calories.toLocaleString()}</Text><Text style={s.chipLbl}>daily goal</Text></View>
         </View>
 
-        {/* Fixed bar chart */}
         <BarChart history={history} goals={goals} />
 
-        {/* Calendar — tap a day to open popup */}
-        <CalendarView
-          history={history}
-          goals={goals}
-          onDayPress={(date) => setModalDate(date)}
-        />
+        <CalendarView history={history} goals={goals} onDayPress={setModalDate} />
 
         <Text style={s.tapHint}>Tap any coloured day to view and edit logged meals.</Text>
 
       </ScrollView>
 
-      {/* Day detail popup */}
       {modalDate && (
         <DayModal
           date={modalDate}
@@ -378,5 +442,5 @@ const s = StyleSheet.create({
   chip:       { flex: 1, backgroundColor: '#1e293b', borderRadius: 14, padding: 14, alignItems: 'center', gap: 4 },
   chipNum:    { fontSize: 22, fontWeight: '900', color: '#10b981' },
   chipLbl:    { fontSize: 10, color: '#64748b', textTransform: 'uppercase', letterSpacing: 0.3 },
-  tapHint:    { fontSize: 11, color: '#334155', textAlign: 'center', paddingHorizontal: 16 },
+  tapHint:    { fontSize: 11, color: '#334155', textAlign: 'center' },
 });
