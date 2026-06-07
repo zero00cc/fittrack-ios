@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Modal, StyleSheet, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { router } from 'expo-router';
 import { useWorkoutStore } from '../../hooks/useWorkoutStore';
 import { workoutPlans } from '../../data/workoutPlans';
 import { exercises as libraryExercises } from '../../data/exercises';
@@ -677,6 +678,15 @@ export default function WorkoutsScreen() {
               >
                 <Text style={styles.celebrationSecondaryText}>View History</Text>
               </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.celebrationHome}
+                onPress={() => {
+                  setCompletedRecord(null);
+                  router.push('/(tabs)');
+                }}
+              >
+                <Text style={styles.celebrationHomeText}>Return to Home</Text>
+              </TouchableOpacity>
             </View>
           </View>
         </Modal>
@@ -882,4 +892,6 @@ const styles = StyleSheet.create({
   celebrationBtnText: { color: '#fff', fontWeight: '700', fontSize: 16 },
   celebrationSecondary: { width: '100%', paddingVertical: 12, alignItems: 'center' },
   celebrationSecondaryText: { color: '#6366f1', fontWeight: '600', fontSize: 14 },
+  celebrationHome: { width: '100%', paddingVertical: 10, alignItems: 'center' },
+  celebrationHomeText: { color: '#9ca3af', fontWeight: '500', fontSize: 13 },
 });
