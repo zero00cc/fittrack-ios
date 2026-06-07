@@ -50,13 +50,13 @@ export function useCalorieStore() {
   const addEntry = useCallback(
     (entry: MacroEntry) => {
       setHistory((prev) => {
-        const current    = prev[today] ?? { date: today, entries: [] };
-        const newHistory = { ...prev, [today]: { ...current, entries: [...current.entries, entry] } };
+        const current    = prev[entry.date] ?? { date: entry.date, entries: [] };
+        const newHistory = { ...prev, [entry.date]: { ...current, entries: [...current.entries, entry] } };
         pushHistory(newHistory);
         return newHistory;
       });
     },
-    [setHistory, today],
+    [setHistory],
   );
 
   const removeEntry = useCallback(

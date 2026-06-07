@@ -1,3 +1,10 @@
+/** Days from dateA to dateB (positive = B is in the future). */
+export function daysBetween(dateA: string, dateB: string): number {
+  const a = new Date(dateA + 'T00:00:00').getTime();
+  const b = new Date(dateB + 'T00:00:00').getTime();
+  return Math.round((b - a) / 86_400_000);
+}
+
 export function toYMD(date: Date): string {
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, '0');

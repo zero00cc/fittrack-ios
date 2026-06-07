@@ -9,6 +9,7 @@ import { useCalorieStore } from '../hooks/useCalorieStore';
 import { MacroEntry } from '../types/calorie.types';
 import { generateId } from '../utils/calorieUtils';
 import { todayYMD } from '../utils/dateUtils';
+// pendingImage.date is set by the main screen before navigating here
 import { analyzeFood, AnalyzedItem } from '../utils/analyzeFood';
 import { pendingImage } from './(tabs)/calories';
 
@@ -90,6 +91,7 @@ export default function CalorieResultScreen() {
   const { addEntry } = useCalorieStore();
   const imageUri  = pendingImage.uri;
   const mimeType  = pendingImage.mimeType;
+  const entryDate = pendingImage.date || todayYMD();
 
   const [status,  setStatus]  = useState<'loading' | 'ready' | 'error'>('loading');
   const [desc,    setDesc]    = useState('');
@@ -126,7 +128,7 @@ export default function CalorieResultScreen() {
     included.forEach((item) => {
       const entry: MacroEntry = {
         id:        generateId(),
-        date:      todayYMD(),
+        date:      entryDate,
         timestamp: new Date().toISOString(),
         name:      item.name,
         imageUri:  imageUri || undefined,

@@ -10,12 +10,59 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useCalorieStore } from '../../hooks/useCalorieStore';
 import { CalorieGoals, MacroEntry } from '../../types/calorie.types';
 import { dayTotals, calorieColor, generateId } from '../../utils/calorieUtils';
-import { todayYMD } from '../../utils/dateUtils';
+import { todayYMD, addDays, daysBetween } from '../../utils/dateUtils';
 import { DonutRing } from '../../components/calorie/DonutRing';
 import { USER_PROFILE_KEY } from '../../utils/nutritionCalc';
 
-// Shared mutable for passing image URI to the result screen (module-level is fine — single JS thread)
-export const pendingImage = { uri: '', mimeType: 'image/jpeg' };
+const MAX_DAYS_BACK = 7;
+
+// Shared object for passing image + target date to the result screen
+export const pendingImage = { uri: '', mimeType: 'image/jpeg', date: '' };
+
+// ── Date navigator ────────────────────────────────────────────────────────────
+
+function DateNav({ date, onPrev, onNext }: { date: string; onPrev: () => void; onNext: () => void }) {
+  const today     = todayYMD();
+  const daysBack  = daysBetween(date, today);  // positive = date is in the past
+  const isToday   = daysBack === 0;
+  const canBack   = daysBack < MAX_DAYS_BACK;
+  const canFwd    = !isToday;
+
+  let label: string;
+  if (isToday)       label = 'Today';
+  else if (daysBack === 1) label = 'Yesterday';
+  else label = new Date(date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+
+  return (
+    <View style={dn.row}>
+      <TouchableOpacity onPress={onPrev} disabled={!canBack} style={dn.arrow} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+        <Text style={[dn.arrowTxt, !canBack && dn.dim]}>←</Text>
+      </TouchableOpacity>
+
+      <View style={dn.center}>
+        <Text style={dn.label}>{label}</Text>
+        {!isToday && (
+          <Text style={dn.sublabel}>
+            {new Date(date + 'T00:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}
+          </Text>
+        )}
+      </View>
+
+      <TouchableOpacity onPress={onNext} disabled={!canFwd} style={dn.arrow} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+        <Text style={[dn.arrowTxt, !canFwd && dn.dim]}>→</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+const dn = StyleSheet.create({
+  row:      { flexDirection: 'row', alignItems: 'center', backgroundColor: '#1e293b', borderRadius: 14, paddingVertical: 10, paddingHorizontal: 4 },
+  arrow:    { paddingHorizontal: 14, paddingVertical: 4 },
+  arrowTxt: { fontSize: 20, color: '#f1f5f9', fontWeight: '700' },
+  dim:      { color: '#334155' },
+  center:   { flex: 1, alignItems: 'center' },
+  label:    { fontSize: 15, fontWeight: '800', color: '#f1f5f9' },
+  sublabel: { fontSize: 11, color: '#64748b', marginTop: 1 },
+});
 
 // ── Animated progress bar ─────────────────────────────────────────────────────
 
@@ -59,30 +106,30 @@ const mc = StyleSheet.create({
 
 // ── Add manually modal ────────────────────────────────────────────────────────
 
-function AddManualModal({ onAdd, onClose }: {
-  onAdd: (entry: MacroEntry) => void;
+function AddManualModal({ date, onAdd, onClose }: {
+  date:    string;
+  onAdd:   (entry: MacroEntry) => void;
   onClose: () => void;
 }) {
-  const [name, setName]   = useState('');
-  const [cal, setCal]     = useState('');
-  const [pro, setPro]     = useState('0');
-  const [carb, setCarb]   = useState('0');
-  const [fat, setFat]     = useState('0');
+  const [name, setName] = useState('');
+  const [cal, setCal]   = useState('');
+  const [pro, setPro]   = useState('0');
+  const [carb, setCarb] = useState('0');
+  const [fat, setFat]   = useState('0');
 
   function add() {
     const calories = parseInt(cal);
     if (!name.trim() || !calories) return;
-    const entry: MacroEntry = {
+    onAdd({
       id:        generateId(),
-      date:      todayYMD(),
+      date,
       timestamp: new Date().toISOString(),
       name:      name.trim(),
       calories,
       protein:   parseInt(pro)  || 0,
       carbs:     parseInt(carb) || 0,
       fat:       parseInt(fat)  || 0,
-    };
-    onAdd(entry);
+    });
     onClose();
   }
 
@@ -94,44 +141,29 @@ function AddManualModal({ onAdd, onClose }: {
             <Text style={am.title}>Add Manually</Text>
             <TouchableOpacity onPress={onClose}><Text style={am.close}>✕</Text></TouchableOpacity>
           </View>
-
           <TextInput
             style={am.nameInput}
             value={name}
             onChangeText={setName}
-            placeholder="Food name (e.g. Banana)"
+            placeholder="Food name"
             placeholderTextColor="#475569"
             autoFocus
           />
-
           <View style={am.macroRow}>
             {([
-              ['Calories', 'kcal', cal, setCal, true],
-              ['Protein',  'g',   pro, setPro, false],
-              ['Carbs',    'g',  carb, setCarb, false],
-              ['Fat',      'g',   fat, setFat, false],
-            ] as [string, string, string, (v: string) => void, boolean][]).map(([lbl, unit, val, set, required]) => (
+              ['Calories','kcal', cal, setCal, true],
+              ['Protein','g', pro, setPro, false],
+              ['Carbs','g', carb, setCarb, false],
+              ['Fat','g', fat, setFat, false],
+            ] as [string,string,string,(v:string)=>void,boolean][]).map(([lbl,unit,val,set,req]) => (
               <View key={lbl} style={am.macroField}>
-                <Text style={[am.macroLabel, required && { color: '#10b981' }]}>{lbl}{required ? ' *' : ''}</Text>
-                <TextInput
-                  style={am.macroInput}
-                  value={val}
-                  onChangeText={set}
-                  keyboardType="numeric"
-                  selectTextOnFocus
-                  placeholder="0"
-                  placeholderTextColor="#334155"
-                />
+                <Text style={[am.macroLabel, req && { color: '#10b981' }]}>{lbl}{req ? ' *' : ''}</Text>
+                <TextInput style={am.macroInput} value={val} onChangeText={set} keyboardType="numeric" selectTextOnFocus placeholder="0" placeholderTextColor="#334155" />
                 <Text style={am.macroUnit}>{unit}</Text>
               </View>
             ))}
           </View>
-
-          <TouchableOpacity
-            style={[am.addBtn, (!name.trim() || !cal) && am.addBtnOff]}
-            onPress={add}
-            disabled={!name.trim() || !cal}
-          >
+          <TouchableOpacity style={[am.addBtn, (!name.trim() || !cal) && am.addBtnOff]} onPress={add} disabled={!name.trim() || !cal}>
             <Text style={am.addTxt}>Add to Log</Text>
           </TouchableOpacity>
         </View>
@@ -159,7 +191,7 @@ const am = StyleSheet.create({
 // ── Edit entry modal ──────────────────────────────────────────────────────────
 
 function EditEntryModal({ entry, onSave, onDelete, onClose }: {
-  entry: MacroEntry;
+  entry:    MacroEntry;
   onSave:   (date: string, id: string, updates: any) => void;
   onDelete: (date: string, id: string) => void;
   onClose:  () => void;
@@ -169,24 +201,6 @@ function EditEntryModal({ entry, onSave, onDelete, onClose }: {
   const [pro, setPro]   = useState(String(entry.protein));
   const [carb, setCarb] = useState(String(entry.carbs));
   const [fat, setFat]   = useState(String(entry.fat));
-
-  function save() {
-    onSave(entry.date, entry.id, {
-      name,
-      calories: parseInt(cal) || entry.calories,
-      protein:  parseInt(pro) || entry.protein,
-      carbs:    parseInt(carb) || entry.carbs,
-      fat:      parseInt(fat) || entry.fat,
-    });
-    onClose();
-  }
-
-  function confirmDelete() {
-    Alert.alert('Delete entry?', entry.name, [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: () => { onDelete(entry.date, entry.id); onClose(); } },
-    ]);
-  }
 
   return (
     <Modal visible animationType="slide" transparent>
@@ -198,12 +212,7 @@ function EditEntryModal({ entry, onSave, onDelete, onClose }: {
           </View>
           <TextInput style={em.nameInput} value={name} onChangeText={setName} placeholder="Food name" placeholderTextColor="#475569" />
           <View style={em.macroRow}>
-            {([
-              ['Calories', 'kcal', cal, setCal],
-              ['Protein',  'g',   pro, setPro],
-              ['Carbs',    'g',  carb, setCarb],
-              ['Fat',      'g',   fat, setFat],
-            ] as [string, string, string, (v: string) => void][]).map(([lbl, unit, val, set]) => (
+            {([['Calories','kcal',cal,setCal],['Protein','g',pro,setPro],['Carbs','g',carb,setCarb],['Fat','g',fat,setFat]] as [string,string,string,(v:string)=>void][]).map(([lbl,unit,val,set]) => (
               <View key={lbl} style={em.macroField}>
                 <Text style={em.macroLabel}>{lbl}</Text>
                 <TextInput style={em.macroInput} value={val} onChangeText={set} keyboardType="numeric" selectTextOnFocus />
@@ -212,10 +221,13 @@ function EditEntryModal({ entry, onSave, onDelete, onClose }: {
             ))}
           </View>
           <View style={em.btns}>
-            <TouchableOpacity style={[em.btn, { backgroundColor: '#334155' }]} onPress={confirmDelete}>
+            <TouchableOpacity style={[em.btn, { backgroundColor: '#334155' }]} onPress={() => { onDelete(entry.date, entry.id); onClose(); }}>
               <Text style={em.deleteTxt}>Delete</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={[em.btn, { backgroundColor: '#10b981' }]} onPress={save}>
+            <TouchableOpacity style={[em.btn, { backgroundColor: '#10b981' }]} onPress={() => {
+              onSave(entry.date, entry.id, { name, calories: parseInt(cal)||entry.calories, protein: parseInt(pro)||entry.protein, carbs: parseInt(carb)||entry.carbs, fat: parseInt(fat)||entry.fat });
+              onClose();
+            }}>
               <Text style={em.saveTxt}>Save</Text>
             </TouchableOpacity>
           </View>
@@ -244,11 +256,7 @@ const em = StyleSheet.create({
 
 // ── Entry row ─────────────────────────────────────────────────────────────────
 
-function EntryRow({ entry, onEdit, onDelete }: {
-  entry:    MacroEntry;
-  onEdit:   () => void;
-  onDelete: () => void;
-}) {
+function EntryRow({ entry, onEdit, onDelete }: { entry: MacroEntry; onEdit: () => void; onDelete: () => void }) {
   return (
     <View style={er.row}>
       <TouchableOpacity style={er.content} onPress={onEdit} activeOpacity={0.7}>
@@ -259,11 +267,7 @@ function EntryRow({ entry, onEdit, onDelete }: {
         </View>
         <Text style={er.kcal}>{entry.calories} kcal</Text>
       </TouchableOpacity>
-      <TouchableOpacity
-        onPress={onDelete}
-        hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-        style={er.delBtn}
-      >
+      <TouchableOpacity onPress={onDelete} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }} style={er.delBtn}>
         <Text style={er.delTxt}>🗑</Text>
       </TouchableOpacity>
     </View>
@@ -276,49 +280,51 @@ const er = StyleSheet.create({
   info:    { flex: 1 },
   name:    { fontSize: 14, fontWeight: '600', color: '#f1f5f9' },
   macros:  { fontSize: 11, color: '#64748b', marginTop: 2 },
-  kcal:   { fontSize: 14, fontWeight: '800', color: '#10b981' },
-  delBtn: { padding: 4 },
-  delTxt: { fontSize: 16 },
+  kcal:    { fontSize: 14, fontWeight: '800', color: '#10b981' },
+  delBtn:  { padding: 4, marginLeft: 6 },
+  delTxt:  { fontSize: 16 },
 });
 
 // ── Main screen ───────────────────────────────────────────────────────────────
 
 export default function CaloriesScreen() {
   const {
-    todayLog, goals, loaded,
+    history, goals, loaded,
     addEntry, removeHistoryEntry, updateEntry, updateGoals,
     reloadHistory, reloadGoals,
   } = useCalorieStore();
 
+  const [selectedDate, setSelectedDate] = useState(todayYMD);
   const [editEntry,  setEditEntry]  = useState<MacroEntry | null>(null);
   const [addManual,  setAddManual]  = useState(false);
 
-  // Celebration
+  // Celebration toast
   const [toast, setToast]   = useState<string | null>(null);
   const toastAnim           = useRef(new Animated.Value(0)).current;
-  const prevCount           = useRef<number | null>(null);
+  const prevLogState        = useRef<{ date: string; count: number } | null>(null);
 
-  // On focus: sync state + guard onboarding
+  // Sync on focus + guard onboarding
   useFocusEffect(useCallback(() => {
     reloadHistory();
     reloadGoals();
     AsyncStorage.getItem(USER_PROFILE_KEY).then((raw) => {
-      if (!(raw && JSON.parse(raw).onboardingComplete)) {
-        router.replace('/calorie-onboarding');
-      }
+      if (!(raw && JSON.parse(raw).onboardingComplete)) router.replace('/calorie-onboarding');
     });
   }, [reloadHistory, reloadGoals]));
 
-  // Celebrate on new entry
+  // Celebrate when a new entry is added to the currently-viewed date
+  const selectedLog = history[selectedDate] ?? { date: selectedDate, entries: [] };
+
   useEffect(() => {
     if (!loaded) return;
-    const count = todayLog.entries.length;
-    if (prevCount.current !== null && count > prevCount.current) {
-      const newest = todayLog.entries[count - 1];
+    const count = selectedLog.entries.length;
+    const prev  = prevLogState.current;
+    if (prev && prev.date === selectedDate && count > prev.count) {
+      const newest = selectedLog.entries[selectedLog.entries.length - 1];
       showToast(`${newest.name} · +${newest.calories} kcal logged!`);
     }
-    prevCount.current = count;
-  }, [todayLog.entries.length, loaded]);
+    prevLogState.current = { date: selectedDate, count };
+  }, [selectedLog.entries.length, selectedDate, loaded]);
 
   function showToast(msg: string) {
     setToast(msg);
@@ -330,13 +336,22 @@ export default function CaloriesScreen() {
     ]).start(() => setToast(null));
   }
 
+  function goBack() {
+    const prev = addDays(selectedDate, -1);
+    if (daysBetween(prev, todayYMD()) <= MAX_DAYS_BACK) setSelectedDate(prev);
+  }
+
+  function goForward() {
+    if (selectedDate < todayYMD()) setSelectedDate(addDays(selectedDate, 1));
+  }
+
   async function openCamera() {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== 'granted') { Alert.alert('Camera access needed', 'Allow in Settings.'); return; }
     const res = await ImagePicker.launchCameraAsync({ quality: 0.8 });
     if (!res.canceled && res.assets[0]) {
       const a = res.assets[0];
-      pendingImage.uri = a.uri; pendingImage.mimeType = a.mimeType ?? 'image/jpeg';
+      pendingImage.uri = a.uri; pendingImage.mimeType = a.mimeType ?? 'image/jpeg'; pendingImage.date = selectedDate;
       router.push('/calorie-result');
     }
   }
@@ -347,26 +362,34 @@ export default function CaloriesScreen() {
     const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.8 });
     if (!res.canceled && res.assets[0]) {
       const a = res.assets[0];
-      pendingImage.uri = a.uri; pendingImage.mimeType = a.mimeType ?? 'image/jpeg';
+      pendingImage.uri = a.uri; pendingImage.mimeType = a.mimeType ?? 'image/jpeg'; pendingImage.date = selectedDate;
       router.push('/calorie-result');
     }
   }
 
   if (!loaded) return <View style={s.center}><Text style={s.loadTxt}>Loading…</Text></View>;
 
-  const totals    = dayTotals(todayLog);
-  const mainColor = calorieColor(totals.calories, goals.calories);
-  const dateLabel = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+  const totals      = dayTotals(selectedLog);
+  const mainColor   = calorieColor(totals.calories, goals.calories);
+  const isToday     = selectedDate === todayYMD();
 
   return (
     <SafeAreaView style={s.safe} edges={['bottom']}>
       <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
 
-        {/* Header — date only, no gear icon */}
-        <View style={s.header}>
-          <Text style={s.headerDate}>{dateLabel}</Text>
-          <Text style={s.headerSub}>Calorie Tracker</Text>
+        {/* Header */}
+        <View style={s.headerRow}>
+          <Text style={s.headerTitle}>Calorie Tracker</Text>
         </View>
+
+        {/* Date navigator */}
+        <DateNav date={selectedDate} onPrev={goBack} onNext={goForward} />
+
+        {!isToday && (
+          <TouchableOpacity onPress={() => setSelectedDate(todayYMD())} style={s.backToday}>
+            <Text style={s.backTodayTxt}>↩ Back to Today</Text>
+          </TouchableOpacity>
+        )}
 
         {/* Donut ring */}
         <View style={s.heroCard}>
@@ -380,7 +403,7 @@ export default function CaloriesScreen() {
           <MacroChip label="Fat"     value={totals.fat}      goal={goals.fat}     color="#f87171" />
         </View>
 
-        {/* Scan row */}
+        {/* Scan buttons */}
         <View style={s.scanRow}>
           <TouchableOpacity style={s.scanMain} onPress={openCamera}>
             <Text style={s.scanIcon}>📷</Text>
@@ -392,7 +415,7 @@ export default function CaloriesScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Add manually button */}
+        {/* Add manually */}
         <TouchableOpacity style={s.addManualBtn} onPress={() => setAddManual(true)}>
           <Text style={s.addManualIcon}>＋</Text>
           <Text style={s.addManualTxt}>Add Manually</Text>
@@ -401,17 +424,19 @@ export default function CaloriesScreen() {
         {/* Today's log */}
         <View style={s.logCard}>
           <View style={s.logHeader}>
-            <Text style={s.logTitle}>Today's Meals</Text>
-            <Text style={s.logCount}>{todayLog.entries.length} items</Text>
+            <Text style={s.logTitle}>{isToday ? "Today's Meals" : 'Meals'}</Text>
+            <Text style={s.logCount}>{selectedLog.entries.length} items</Text>
           </View>
-          {todayLog.entries.length === 0 ? (
+          {selectedLog.entries.length === 0 ? (
             <View style={s.empty}>
               <Text style={s.emptyIcon}>🍽️</Text>
-              <Text style={s.emptyTxt}>No meals logged yet</Text>
-              <Text style={s.emptySub}>Tap Scan Food or Add Manually to get started</Text>
+              <Text style={s.emptyTxt}>No meals logged{isToday ? ' yet' : ' for this day'}</Text>
+              <Text style={s.emptySub}>
+                {isToday ? 'Tap Scan Food or Add Manually to get started' : 'Use the buttons above to add a past meal'}
+              </Text>
             </View>
           ) : (
-            [...todayLog.entries].reverse().map((entry) => (
+            [...selectedLog.entries].reverse().map((entry) => (
               <EntryRow
                 key={entry.id}
                 entry={entry}
@@ -422,13 +447,13 @@ export default function CaloriesScreen() {
           )}
         </View>
 
-        {/* Bottom nav buttons */}
+        {/* Bottom nav */}
         <View style={s.bottomRow}>
-          <TouchableOpacity style={[s.bottomBtn, s.bottomBtnPrimary]} onPress={() => router.push('/calorie-progress')}>
+          <TouchableOpacity style={s.bottomBtn} onPress={() => router.push('/calorie-progress')}>
             <Text style={s.bottomBtnIcon}>📊</Text>
             <Text style={s.bottomBtnTxt}>Progress</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={[s.bottomBtn, s.bottomBtnSecondary]} onPress={() => router.push('/calorie-settings')}>
+          <TouchableOpacity style={s.bottomBtn} onPress={() => router.push('/calorie-settings')}>
             <Text style={s.bottomBtnIcon}>⚙️</Text>
             <Text style={[s.bottomBtnTxt, { color: '#94a3b8' }]}>Settings</Text>
           </TouchableOpacity>
@@ -448,7 +473,7 @@ export default function CaloriesScreen() {
       )}
 
       {/* Add manually modal */}
-      {addManual && <AddManualModal onAdd={addEntry} onClose={() => setAddManual(false)} />}
+      {addManual && <AddManualModal date={selectedDate} onAdd={addEntry} onClose={() => setAddManual(false)} />}
 
       {/* Edit entry modal */}
       {editEntry && (
@@ -469,9 +494,11 @@ const s = StyleSheet.create({
   loadTxt:          { color: '#64748b', fontSize: 15 },
   scroll:           { padding: 16, gap: 12, paddingBottom: 40 },
 
-  header:           { gap: 2 },
-  headerDate:       { fontSize: 20, fontWeight: '800', color: '#f1f5f9' },
-  headerSub:        { fontSize: 12, color: '#64748b' },
+  headerRow:        { flexDirection: 'row', alignItems: 'center' },
+  headerTitle:      { fontSize: 20, fontWeight: '800', color: '#f1f5f9' },
+
+  backToday:        { alignSelf: 'center' },
+  backTodayTxt:     { color: '#10b981', fontSize: 13, fontWeight: '600' },
 
   heroCard:         { backgroundColor: '#1e293b', borderRadius: 24, padding: 20, alignItems: 'center' },
   macroRow:         { flexDirection: 'row', gap: 8 },
@@ -497,9 +524,7 @@ const s = StyleSheet.create({
   emptySub:         { fontSize: 12, color: '#334155', textAlign: 'center' },
 
   bottomRow:        { flexDirection: 'row', gap: 10 },
-  bottomBtn:        { flex: 1, borderRadius: 16, paddingVertical: 16, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8 },
-  bottomBtnPrimary: { backgroundColor: '#1e293b' },
-  bottomBtnSecondary:{ backgroundColor: '#1e293b' },
+  bottomBtn:        { flex: 1, backgroundColor: '#1e293b', borderRadius: 16, paddingVertical: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
   bottomBtnIcon:    { fontSize: 18 },
   bottomBtnTxt:     { fontSize: 14, fontWeight: '700', color: '#f1f5f9' },
 

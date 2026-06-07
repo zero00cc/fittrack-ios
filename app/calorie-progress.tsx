@@ -1,13 +1,15 @@
 import { useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, Modal,
-  StyleSheet, Alert, TextInput,
+  StyleSheet, TextInput,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useCalorieStore } from '../hooks/useCalorieStore';
-import { dayTotals, calorieColor } from '../utils/calorieUtils';
-import { getLast30Days, formatShortDate, toYMD } from '../utils/dateUtils';
+import { dayTotals, calorieColor, generateId } from '../utils/calorieUtils';
+import { getLast30Days, formatShortDate, toYMD, todayYMD, daysBetween } from '../utils/dateUtils';
 import { MacroEntry } from '../types/calorie.types';
+
+const MAX_DAYS_BACK = 7;
 
 // ── Chart helpers ─────────────────────────────────────────────────────────────
 
@@ -291,25 +293,89 @@ const ee = StyleSheet.create({
   saveTxt:    { color: '#fff', fontWeight: '700', fontSize: 15 },
 });
 
+// ── Inline add-entry form (used inside DayModal) ──────────────────────────────
+
+function AddEntryForm({ date, onAdd, onClose }: {
+  date: string; onAdd: (e: MacroEntry) => void; onClose: () => void;
+}) {
+  const [name, setName] = useState('');
+  const [cal,  setCal]  = useState('');
+  const [pro,  setPro]  = useState('0');
+  const [carb, setCarb] = useState('0');
+  const [fat,  setFat]  = useState('0');
+
+  function submit() {
+    const calories = parseInt(cal);
+    if (!name.trim() || !calories) return;
+    onAdd({
+      id: generateId(), date, timestamp: new Date().toISOString(),
+      name: name.trim(), calories,
+      protein: parseInt(pro) || 0, carbs: parseInt(carb) || 0, fat: parseInt(fat) || 0,
+    });
+    onClose();
+  }
+
+  return (
+    <View style={af.wrap}>
+      <View style={af.header}>
+        <Text style={af.title}>Add Entry</Text>
+        <TouchableOpacity onPress={onClose}><Text style={af.close}>✕</Text></TouchableOpacity>
+      </View>
+      <TextInput style={af.nameInput} value={name} onChangeText={setName} placeholder="Food name" placeholderTextColor="#475569" autoFocus />
+      <View style={af.row}>
+        {([['Kcal',cal,setCal,true],['Protein',pro,setPro,false],['Carbs',carb,setCarb,false],['Fat',fat,setFat,false]] as [string,string,(v:string)=>void,boolean][]).map(([l,v,s,req]) => (
+          <View key={l} style={af.field}>
+            <Text style={[af.fieldLbl, req && { color: '#10b981' }]}>{l}</Text>
+            <TextInput style={af.fieldInput} value={v} onChangeText={s} keyboardType="numeric" selectTextOnFocus placeholder="0" placeholderTextColor="#334155" />
+          </View>
+        ))}
+      </View>
+      <TouchableOpacity style={[af.btn, (!name.trim()||!cal) && af.btnOff]} onPress={submit} disabled={!name.trim()||!cal}>
+        <Text style={af.btnTxt}>Add to Log</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+const af = StyleSheet.create({
+  wrap:      { gap: 10 },
+  header:    { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  title:     { fontSize: 15, fontWeight: '700', color: '#f1f5f9' },
+  close:     { color: '#475569', fontSize: 16, padding: 4 },
+  nameInput: { backgroundColor: '#0f172a', color: '#f1f5f9', fontSize: 14, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10 },
+  row:       { flexDirection: 'row', gap: 6 },
+  field:     { flex: 1, alignItems: 'center', gap: 3 },
+  fieldLbl:  { fontSize: 9, color: '#64748b', fontWeight: '700', textTransform: 'uppercase' },
+  fieldInput:{ backgroundColor: '#0f172a', color: '#f1f5f9', fontSize: 13, fontWeight: '700', borderRadius: 6, paddingVertical: 8, width: '100%', textAlign: 'center' },
+  btn:       { backgroundColor: '#10b981', borderRadius: 10, paddingVertical: 12, alignItems: 'center' },
+  btnOff:    { backgroundColor: '#1e293b' },
+  btnTxt:    { color: '#fff', fontWeight: '700', fontSize: 14 },
+});
+
 // ── Day detail modal — CENTERED ───────────────────────────────────────────────
 
-function DayModal({ date, history, goals, updateEntry, removeHistoryEntry, onClose }: {
+function DayModal({ date, history, goals, addEntry, updateEntry, removeHistoryEntry, onClose }: {
   date: string; history: any; goals: any;
-  updateEntry: (d: string, id: string, u: any) => void;
+  addEntry:           (e: MacroEntry) => void;
+  updateEntry:        (d: string, id: string, u: any) => void;
   removeHistoryEntry: (d: string, id: string) => void;
   onClose: () => void;
 }) {
-  const [editingEntry, setEditing] = useState<MacroEntry | null>(null);
-  const log    = history[date] as { date: string; entries: MacroEntry[] } | undefined;
-  const totals = dayTotals(log);
-  const color  = calorieColor(totals.calories, goals.calories);
-  const label  = new Date(date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+  type View = 'list' | 'edit' | 'add';
+  const [view, setView]             = useState<View>('list');
+  const [editingEntry, setEditing]  = useState<MacroEntry | null>(null);
+
+  const log     = history[date] as { date: string; entries: MacroEntry[] } | undefined;
+  const totals  = dayTotals(log);
+  const color   = calorieColor(totals.calories, goals.calories);
+  const label   = new Date(date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+  const canAdd  = daysBetween(date, todayYMD()) <= MAX_DAYS_BACK;  // within 7 days
+
+  function startEdit(entry: MacroEntry) { setEditing(entry); setView('edit'); }
+  function closeSubView()               { setEditing(null); setView('list'); }
 
   return (
     <Modal visible animationType="fade" transparent>
-      {/* Full-screen backdrop — tap outside to dismiss */}
       <TouchableOpacity style={dm.backdrop} activeOpacity={1} onPress={onClose}>
-        {/* Stop propagation so tapping inside the card doesn't close */}
         <TouchableOpacity activeOpacity={1} style={dm.card} onPress={() => {}}>
 
           {/* Header */}
@@ -324,36 +390,43 @@ function DayModal({ date, history, goals, updateEntry, removeHistoryEntry, onClo
             </TouchableOpacity>
           </View>
 
-          {/* Divider */}
           <View style={dm.divider} />
 
-          {/* Content */}
-          <ScrollView style={{ maxHeight: 320 }} showsVerticalScrollIndicator={false}>
-            {!log || log.entries.length === 0 ? (
-              <Text style={dm.empty}>No meals logged this day.</Text>
-            ) : editingEntry ? (
-              <EditHistoryEntry
-                entry={editingEntry}
-                date={date}
-                onSave={updateEntry}
-                onClose={() => setEditing(null)}
-              />
+          {/* Content — switches between list / edit / add */}
+          <ScrollView style={{ maxHeight: 340 }} showsVerticalScrollIndicator={false}>
+            {view === 'add' ? (
+              <AddEntryForm date={date} onAdd={addEntry} onClose={closeSubView} />
+            ) : view === 'edit' && editingEntry ? (
+              <EditHistoryEntry entry={editingEntry} date={date} onSave={updateEntry} onClose={closeSubView} />
             ) : (
-              log.entries.map((entry) => (
-                <View key={entry.id} style={dm.row}>
-                  <View style={dm.rowInfo}>
-                    <Text style={dm.rowName} numberOfLines={1}>{entry.name}</Text>
-                    <Text style={dm.rowMacros}>P {entry.protein}g · C {entry.carbs}g · F {entry.fat}g</Text>
-                  </View>
-                  <Text style={dm.rowKcal}>{entry.calories} kcal</Text>
-                  <TouchableOpacity onPress={() => setEditing(entry)} style={dm.actionBtn}>
-                    <Text style={dm.editTxt}>✎</Text>
+              <>
+                {!log || log.entries.length === 0 ? (
+                  <Text style={dm.empty}>No meals logged this day.</Text>
+                ) : (
+                  log.entries.map((entry) => (
+                    <View key={entry.id} style={dm.row}>
+                      <View style={dm.rowInfo}>
+                        <Text style={dm.rowName} numberOfLines={1}>{entry.name}</Text>
+                        <Text style={dm.rowMacros}>P {entry.protein}g · C {entry.carbs}g · F {entry.fat}g</Text>
+                      </View>
+                      <Text style={dm.rowKcal}>{entry.calories} kcal</Text>
+                      <TouchableOpacity onPress={() => startEdit(entry)} style={dm.actionBtn}>
+                        <Text style={dm.editTxt}>✎</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity onPress={() => removeHistoryEntry(date, entry.id)} style={dm.actionBtn}>
+                        <Text style={dm.delTxt}>🗑</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ))
+                )}
+
+                {/* Add entry button — only within 7 days */}
+                {canAdd && (
+                  <TouchableOpacity style={dm.addBtn} onPress={() => setView('add')}>
+                    <Text style={dm.addBtnTxt}>＋  Add Entry</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity onPress={() => removeHistoryEntry(date, entry.id)} style={dm.actionBtn}>
-                    <Text style={dm.delTxt}>🗑</Text>
-                  </TouchableOpacity>
-                </View>
-              ))
+                )}
+              </>
             )}
           </ScrollView>
 
@@ -374,6 +447,8 @@ const dm = StyleSheet.create({
   closeTxt:  { color: '#475569', fontSize: 20 },
   divider:   { height: 1, backgroundColor: '#0f172a' },
   empty:     { fontSize: 14, color: '#475569', textAlign: 'center', paddingVertical: 24 },
+  addBtn:    { marginTop: 12, backgroundColor: '#0f172a', borderRadius: 10, paddingVertical: 12, alignItems: 'center', borderWidth: 1, borderColor: '#334155' },
+  addBtnTxt: { color: '#10b981', fontWeight: '700', fontSize: 14 },
   row:       { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#0f172a', gap: 8 },
   rowInfo:   { flex: 1 },
   rowName:   { fontSize: 14, fontWeight: '600', color: '#f1f5f9' },
@@ -387,7 +462,7 @@ const dm = StyleSheet.create({
 // ── Main screen ───────────────────────────────────────────────────────────────
 
 export default function CalorieProgressScreen() {
-  const { history, goals, loaded, updateEntry, removeHistoryEntry } = useCalorieStore();
+  const { history, goals, loaded, addEntry, updateEntry, removeHistoryEntry } = useCalorieStore();
   const [modalDate, setModalDate] = useState<string | null>(null);
 
   if (!loaded) {
@@ -424,6 +499,7 @@ export default function CalorieProgressScreen() {
           date={modalDate}
           history={history}
           goals={goals}
+          addEntry={addEntry}
           updateEntry={updateEntry}
           removeHistoryEntry={removeHistoryEntry}
           onClose={() => setModalDate(null)}
