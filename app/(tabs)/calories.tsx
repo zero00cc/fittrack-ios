@@ -120,8 +120,8 @@ const gm = StyleSheet.create({
 
 // ── Edit entry modal ──────────────────────────────────────────────────────────
 
-function EditEntryModal({ entry, date, onSave, onDelete, onClose }: {
-  entry: MacroEntry; date: string;
+function EditEntryModal({ entry, onSave, onDelete, onClose }: {
+  entry: MacroEntry;
   onSave: (date: string, id: string, updates: any) => void;
   onDelete: (date: string, id: string) => void;
   onClose: () => void;
@@ -133,7 +133,7 @@ function EditEntryModal({ entry, date, onSave, onDelete, onClose }: {
   const [fat, setFat]     = useState(String(entry.fat));
 
   function save() {
-    onSave(date, entry.id, {
+    onSave(entry.date, entry.id, {
       name,
       calories: parseInt(cal) || entry.calories,
       protein:  parseInt(pro) || entry.protein,
@@ -146,7 +146,7 @@ function EditEntryModal({ entry, date, onSave, onDelete, onClose }: {
   function confirmDelete() {
     Alert.alert('Delete entry?', entry.name, [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: () => { onDelete(date, entry.id); onClose(); } },
+      { text: 'Delete', style: 'destructive', onPress: () => { onDelete(entry.date, entry.id); onClose(); } },
     ]);
   }
 
@@ -295,7 +295,6 @@ export default function CaloriesScreen() {
   const totals    = dayTotals(todayLog);
   const mainColor = calorieColor(totals.calories, goals.calories);
   const todayDate = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
-  const todayKey  = new Date().toISOString().slice(0, 10);
 
   return (
     <SafeAreaView style={s.safe} edges={['bottom']}>
@@ -388,7 +387,6 @@ export default function CaloriesScreen() {
       {editEntry && (
         <EditEntryModal
           entry={editEntry}
-          date={todayKey}
           onSave={updateEntry}
           onDelete={removeHistoryEntry}
           onClose={() => setEditEntry(null)}
