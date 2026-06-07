@@ -118,12 +118,17 @@ export function useCalorieStore() {
   );
 
   // ── Cross-screen sync ───────────────────────────────────────────────────────
-  // Called by the main screen on focus to pick up entries added from result screen
+  // Called on screen focus to sync state written by result/settings screens
 
   const reloadHistory = useCallback(async () => {
     const raw = await AsyncStorage.getItem(HISTORY_KEY);
     if (raw) setHistory(JSON.parse(raw) as CalorieHistory);
   }, [setHistory]);
+
+  const reloadGoals = useCallback(async () => {
+    const raw = await AsyncStorage.getItem(GOALS_KEY);
+    if (raw) setGoals(JSON.parse(raw) as CalorieGoals);
+  }, [setGoals]);
 
   return {
     history,
@@ -136,5 +141,6 @@ export function useCalorieStore() {
     removeHistoryEntry,
     updateGoals,
     reloadHistory,
+    reloadGoals,
   };
 }

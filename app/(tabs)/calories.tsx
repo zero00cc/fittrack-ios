@@ -9,11 +9,12 @@ import * as ImagePicker from 'expo-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useCalorieStore } from '../../hooks/useCalorieStore';
 import { CalorieGoals, MacroEntry } from '../../types/calorie.types';
-import { dayTotals, calorieColor } from '../../utils/calorieUtils';
+import { dayTotals, calorieColor, generateId } from '../../utils/calorieUtils';
+import { todayYMD } from '../../utils/dateUtils';
 import { DonutRing } from '../../components/calorie/DonutRing';
-import { USER_PROFILE_KEY } from '../calorie-onboarding';
+import { USER_PROFILE_KEY } from '../../utils/nutritionCalc';
 
-// Shared state for passing image URI to the result screen
+// Shared mutable for passing image URI to the result screen (module-level is fine — single JS thread)
 export const pendingImage = { uri: '', mimeType: 'image/jpeg' };
 
 // ── Animated progress bar ─────────────────────────────────────────────────────
@@ -21,15 +22,13 @@ export const pendingImage = { uri: '', mimeType: 'image/jpeg' };
 function ProgressBar({ value, max, color }: { value: number; max: number; color: string }) {
   const anim = useRef(new Animated.Value(0)).current;
   const pct  = max > 0 ? Math.min(1, value / max) : 0;
-
   useEffect(() => {
     Animated.timing(anim, { toValue: pct, duration: 600, useNativeDriver: false }).start();
   }, [pct]);
-
   return (
     <View style={pb.track}>
       <Animated.View style={[pb.fill, { flex: anim, backgroundColor: color }]} />
-      <View style={[pb.bg, { flex: anim.interpolate({ inputRange: [0,1], outputRange: [1,0] }) as any }]} />
+      <View style={[pb.bg, { flex: anim.interpolate({ inputRange: [0, 1], outputRange: [1, 0] }) as any }]} />
     </View>
   );
 }
@@ -47,7 +46,7 @@ function MacroChip({ label, value, goal, color }: { label: string; value: number
       <Text style={[mc.value, { color }]}>{value}g</Text>
       <Text style={mc.label}>{label}</Text>
       <ProgressBar value={value} max={goal} color={color} />
-      <Text style={mc.sub}>{goal > 0 ? Math.min(100, Math.round((value/goal)*100)) : 0}% of {goal}g</Text>
+      <Text style={mc.sub}>{goal > 0 ? Math.min(100, Math.round((value / goal) * 100)) : 0}% of {goal}g</Text>
     </View>
   );
 }
@@ -58,79 +57,118 @@ const mc = StyleSheet.create({
   sub:   { fontSize: 9, color: '#475569', marginTop: 2 },
 });
 
-// ── Goals modal ───────────────────────────────────────────────────────────────
+// ── Add manually modal ────────────────────────────────────────────────────────
 
-function GoalsModal({ visible, goals, onSave, onClose, onResetOnboarding }: {
-  visible: boolean; goals: CalorieGoals;
-  onSave: (g: CalorieGoals) => void;
+function AddManualModal({ onAdd, onClose }: {
+  onAdd: (entry: MacroEntry) => void;
   onClose: () => void;
-  onResetOnboarding: () => void;
 }) {
-  const [cal, setCal]   = useState(String(goals.calories));
-  const [pro, setPro]   = useState(String(goals.protein));
-  const [carb, setCarb] = useState(String(goals.carbs));
-  const [fat, setFat]   = useState(String(goals.fat));
+  const [name, setName]   = useState('');
+  const [cal, setCal]     = useState('');
+  const [pro, setPro]     = useState('0');
+  const [carb, setCarb]   = useState('0');
+  const [fat, setFat]     = useState('0');
 
-  useEffect(() => {
-    if (visible) { setCal(String(goals.calories)); setPro(String(goals.protein)); setCarb(String(goals.carbs)); setFat(String(goals.fat)); }
-  }, [visible, goals]);
-
-  function save() {
-    onSave({ calories: parseInt(cal)||goals.calories, protein: parseInt(pro)||goals.protein, carbs: parseInt(carb)||goals.carbs, fat: parseInt(fat)||goals.fat });
+  function add() {
+    const calories = parseInt(cal);
+    if (!name.trim() || !calories) return;
+    const entry: MacroEntry = {
+      id:        generateId(),
+      date:      todayYMD(),
+      timestamp: new Date().toISOString(),
+      name:      name.trim(),
+      calories,
+      protein:   parseInt(pro)  || 0,
+      carbs:     parseInt(carb) || 0,
+      fat:       parseInt(fat)  || 0,
+    };
+    onAdd(entry);
     onClose();
   }
 
   return (
-    <Modal visible={visible} animationType="slide" transparent>
-      <View style={gm.overlay}>
-        <View style={gm.sheet}>
-          <Text style={gm.title}>Daily Goals</Text>
-          {[['Calories (kcal)', cal, setCal],['Protein (g)', pro, setPro],['Carbs (g)', carb, setCarb],['Fat (g)', fat, setFat]].map(([lbl, val, set]: any) => (
-            <View key={lbl} style={gm.row}>
-              <Text style={gm.rowLabel}>{lbl}</Text>
-              <TextInput style={gm.input} value={val} onChangeText={set} keyboardType="numeric" selectTextOnFocus />
-            </View>
-          ))}
-          <View style={gm.btns}>
-            <TouchableOpacity style={[gm.btn, { backgroundColor: '#334155' }]} onPress={onClose}><Text style={gm.btnTxtGrey}>Cancel</Text></TouchableOpacity>
-            <TouchableOpacity style={[gm.btn, { backgroundColor: '#10b981' }]} onPress={save}><Text style={gm.btnTxtWhite}>Save</Text></TouchableOpacity>
+    <Modal visible animationType="slide" transparent>
+      <View style={am.overlay}>
+        <View style={am.sheet}>
+          <View style={am.header}>
+            <Text style={am.title}>Add Manually</Text>
+            <TouchableOpacity onPress={onClose}><Text style={am.close}>✕</Text></TouchableOpacity>
           </View>
-          <TouchableOpacity style={gm.recalc} onPress={() => { onClose(); onResetOnboarding(); }}>
-            <Text style={gm.recalcTxt}>↻  Recalculate from my profile</Text>
+
+          <TextInput
+            style={am.nameInput}
+            value={name}
+            onChangeText={setName}
+            placeholder="Food name (e.g. Banana)"
+            placeholderTextColor="#475569"
+            autoFocus
+          />
+
+          <View style={am.macroRow}>
+            {([
+              ['Calories', 'kcal', cal, setCal, true],
+              ['Protein',  'g',   pro, setPro, false],
+              ['Carbs',    'g',  carb, setCarb, false],
+              ['Fat',      'g',   fat, setFat, false],
+            ] as [string, string, string, (v: string) => void, boolean][]).map(([lbl, unit, val, set, required]) => (
+              <View key={lbl} style={am.macroField}>
+                <Text style={[am.macroLabel, required && { color: '#10b981' }]}>{lbl}{required ? ' *' : ''}</Text>
+                <TextInput
+                  style={am.macroInput}
+                  value={val}
+                  onChangeText={set}
+                  keyboardType="numeric"
+                  selectTextOnFocus
+                  placeholder="0"
+                  placeholderTextColor="#334155"
+                />
+                <Text style={am.macroUnit}>{unit}</Text>
+              </View>
+            ))}
+          </View>
+
+          <TouchableOpacity
+            style={[am.addBtn, (!name.trim() || !cal) && am.addBtnOff]}
+            onPress={add}
+            disabled={!name.trim() || !cal}
+          >
+            <Text style={am.addTxt}>Add to Log</Text>
           </TouchableOpacity>
         </View>
       </View>
     </Modal>
   );
 }
-const gm = StyleSheet.create({
+const am = StyleSheet.create({
   overlay:    { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
-  sheet:      { backgroundColor: '#1e293b', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, gap: 12 },
-  title:      { fontSize: 18, fontWeight: '800', color: '#f1f5f9', marginBottom: 4 },
-  row:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  rowLabel:   { fontSize: 14, color: '#94a3b8' },
-  input:      { backgroundColor: '#0f172a', color: '#f1f5f9', fontSize: 16, fontWeight: '700', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, width: 100, textAlign: 'right' },
-  btns:       { flexDirection: 'row', gap: 12, marginTop: 4 },
-  btn:        { flex: 1, borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
-  btnTxtGrey: { color: '#94a3b8', fontWeight: '700', fontSize: 15 },
-  btnTxtWhite:{ color: '#fff', fontWeight: '700', fontSize: 15 },
-  recalc:     { alignSelf: 'center', paddingVertical: 8 },
-  recalcTxt:  { color: '#10b981', fontSize: 13, fontWeight: '600' },
+  sheet:      { backgroundColor: '#1e293b', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, gap: 14, paddingBottom: 36 },
+  header:     { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  title:      { fontSize: 17, fontWeight: '800', color: '#f1f5f9' },
+  close:      { color: '#475569', fontSize: 20, padding: 4 },
+  nameInput:  { backgroundColor: '#0f172a', color: '#f1f5f9', fontSize: 15, fontWeight: '600', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12 },
+  macroRow:   { flexDirection: 'row', gap: 8 },
+  macroField: { flex: 1, alignItems: 'center', gap: 4 },
+  macroLabel: { fontSize: 9, color: '#64748b', fontWeight: '700', textTransform: 'uppercase' },
+  macroInput: { backgroundColor: '#0f172a', color: '#f1f5f9', fontSize: 15, fontWeight: '700', borderRadius: 8, paddingVertical: 8, width: '100%', textAlign: 'center' },
+  macroUnit:  { fontSize: 9, color: '#475569' },
+  addBtn:     { backgroundColor: '#10b981', borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
+  addBtnOff:  { backgroundColor: '#1e293b' },
+  addTxt:     { color: '#fff', fontWeight: '700', fontSize: 15 },
 });
 
 // ── Edit entry modal ──────────────────────────────────────────────────────────
 
 function EditEntryModal({ entry, onSave, onDelete, onClose }: {
   entry: MacroEntry;
-  onSave: (date: string, id: string, updates: any) => void;
+  onSave:   (date: string, id: string, updates: any) => void;
   onDelete: (date: string, id: string) => void;
-  onClose: () => void;
+  onClose:  () => void;
 }) {
-  const [name, setName]   = useState(entry.name);
-  const [cal, setCal]     = useState(String(entry.calories));
-  const [pro, setPro]     = useState(String(entry.protein));
-  const [carb, setCarb]   = useState(String(entry.carbs));
-  const [fat, setFat]     = useState(String(entry.fat));
+  const [name, setName] = useState(entry.name);
+  const [cal, setCal]   = useState(String(entry.calories));
+  const [pro, setPro]   = useState(String(entry.protein));
+  const [carb, setCarb] = useState(String(entry.carbs));
+  const [fat, setFat]   = useState(String(entry.fat));
 
   function save() {
     onSave(entry.date, entry.id, {
@@ -160,7 +198,12 @@ function EditEntryModal({ entry, onSave, onDelete, onClose }: {
           </View>
           <TextInput style={em.nameInput} value={name} onChangeText={setName} placeholder="Food name" placeholderTextColor="#475569" />
           <View style={em.macroRow}>
-            {[['Calories','kcal',cal,setCal],['Protein','g',pro,setPro],['Carbs','g',carb,setCarb],['Fat','g',fat,setFat]].map(([lbl,unit,val,set]: any) => (
+            {([
+              ['Calories', 'kcal', cal, setCal],
+              ['Protein',  'g',   pro, setPro],
+              ['Carbs',    'g',  carb, setCarb],
+              ['Fat',      'g',   fat, setFat],
+            ] as [string, string, string, (v: string) => void][]).map(([lbl, unit, val, set]) => (
               <View key={lbl} style={em.macroField}>
                 <Text style={em.macroLabel}>{lbl}</Text>
                 <TextInput style={em.macroInput} value={val} onChangeText={set} keyboardType="numeric" selectTextOnFocus />
@@ -169,8 +212,12 @@ function EditEntryModal({ entry, onSave, onDelete, onClose }: {
             ))}
           </View>
           <View style={em.btns}>
-            <TouchableOpacity style={[em.btn, { backgroundColor: '#334155' }]} onPress={confirmDelete}><Text style={em.btnRed}>Delete</Text></TouchableOpacity>
-            <TouchableOpacity style={[em.btn, { backgroundColor: '#10b981' }]} onPress={save}><Text style={em.btnWhite}>Save</Text></TouchableOpacity>
+            <TouchableOpacity style={[em.btn, { backgroundColor: '#334155' }]} onPress={confirmDelete}>
+              <Text style={em.deleteTxt}>Delete</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[em.btn, { backgroundColor: '#10b981' }]} onPress={save}>
+              <Text style={em.saveTxt}>Save</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </View>
@@ -179,7 +226,7 @@ function EditEntryModal({ entry, onSave, onDelete, onClose }: {
 }
 const em = StyleSheet.create({
   overlay:    { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
-  sheet:      { backgroundColor: '#1e293b', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, gap: 14 },
+  sheet:      { backgroundColor: '#1e293b', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, gap: 14, paddingBottom: 36 },
   header:     { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   title:      { fontSize: 17, fontWeight: '800', color: '#f1f5f9' },
   close:      { color: '#475569', fontSize: 18, padding: 4 },
@@ -187,76 +234,98 @@ const em = StyleSheet.create({
   macroRow:   { flexDirection: 'row', gap: 8 },
   macroField: { flex: 1, alignItems: 'center', gap: 4 },
   macroLabel: { fontSize: 9, color: '#64748b', fontWeight: '700', textTransform: 'uppercase' },
-  macroInput: { backgroundColor: '#0f172a', color: '#f1f5f9', fontSize: 15, fontWeight: '700', borderRadius: 8, paddingHorizontal: 6, paddingVertical: 8, width: '100%', textAlign: 'center' },
+  macroInput: { backgroundColor: '#0f172a', color: '#f1f5f9', fontSize: 15, fontWeight: '700', borderRadius: 8, paddingVertical: 8, width: '100%', textAlign: 'center' },
   macroUnit:  { fontSize: 9, color: '#475569' },
   btns:       { flexDirection: 'row', gap: 12 },
   btn:        { flex: 1, borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
-  btnRed:     { color: '#f87171', fontWeight: '700', fontSize: 15 },
-  btnWhite:   { color: '#fff', fontWeight: '700', fontSize: 15 },
+  deleteTxt:  { color: '#f87171', fontWeight: '700', fontSize: 15 },
+  saveTxt:    { color: '#fff', fontWeight: '700', fontSize: 15 },
 });
 
 // ── Entry row ─────────────────────────────────────────────────────────────────
 
-function EntryRow({ entry, onPress }: { entry: MacroEntry; onPress: () => void }) {
+function EntryRow({ entry, onEdit, onDelete }: {
+  entry:    MacroEntry;
+  onEdit:   () => void;
+  onDelete: () => void;
+}) {
+  function confirmDelete() {
+    Alert.alert('Delete?', entry.name, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: onDelete },
+    ]);
+  }
+
   return (
-    <TouchableOpacity style={er.row} onPress={onPress} activeOpacity={0.7}>
-      {entry.imageUri && <Image source={{ uri: entry.imageUri }} style={er.thumb} />}
+    <TouchableOpacity style={er.row} onPress={onEdit} activeOpacity={0.75}>
+      {entry.imageUri ? <Image source={{ uri: entry.imageUri }} style={er.thumb} /> : null}
       <View style={er.info}>
         <Text style={er.name} numberOfLines={1}>{entry.name}</Text>
         <Text style={er.macros}>P {entry.protein}g · C {entry.carbs}g · F {entry.fat}g</Text>
       </View>
       <Text style={er.kcal}>{entry.calories} kcal</Text>
-      <Text style={er.editHint}>✎</Text>
+      {/* Direct delete button — no need to open edit modal */}
+      <TouchableOpacity
+        onPress={confirmDelete}
+        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        style={er.delBtn}
+      >
+        <Text style={er.delTxt}>🗑</Text>
+      </TouchableOpacity>
     </TouchableOpacity>
   );
 }
 const er = StyleSheet.create({
-  row:     { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#0f172a', gap: 8 },
-  thumb:   { width: 40, height: 40, borderRadius: 8, resizeMode: 'cover' },
-  info:    { flex: 1 },
-  name:    { fontSize: 14, fontWeight: '600', color: '#f1f5f9' },
-  macros:  { fontSize: 11, color: '#64748b', marginTop: 2 },
-  kcal:    { fontSize: 14, fontWeight: '800', color: '#10b981' },
-  editHint:{ color: '#334155', fontSize: 16, paddingLeft: 6 },
+  row:    { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#0f172a', gap: 8 },
+  thumb:  { width: 40, height: 40, borderRadius: 8, resizeMode: 'cover' },
+  info:   { flex: 1 },
+  name:   { fontSize: 14, fontWeight: '600', color: '#f1f5f9' },
+  macros: { fontSize: 11, color: '#64748b', marginTop: 2 },
+  kcal:   { fontSize: 14, fontWeight: '800', color: '#10b981' },
+  delBtn: { padding: 4 },
+  delTxt: { fontSize: 16 },
 });
 
 // ── Main screen ───────────────────────────────────────────────────────────────
 
-const today = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
-
 export default function CaloriesScreen() {
-  const { history, todayLog, goals, loaded, addEntry, removeHistoryEntry, updateEntry, updateGoals, reloadHistory } = useCalorieStore();
-  const [goalsOpen, setGoalsOpen]     = useState(false);
-  const [editEntry, setEditEntry]     = useState<MacroEntry | null>(null);
+  const {
+    todayLog, goals, loaded,
+    addEntry, removeHistoryEntry, updateEntry, updateGoals,
+    reloadHistory, reloadGoals,
+  } = useCalorieStore();
 
-  // Celebration toast
-  const [toast, setToast]     = useState<string | null>(null);
-  const toastAnim             = useRef(new Animated.Value(0)).current;
-  const prevCount             = useRef<number | null>(null);
+  const [editEntry,  setEditEntry]  = useState<MacroEntry | null>(null);
+  const [addManual,  setAddManual]  = useState(false);
 
-  // On focus: reload history + check onboarding
+  // Celebration
+  const [toast, setToast]   = useState<string | null>(null);
+  const toastAnim           = useRef(new Animated.Value(0)).current;
+  const prevCount           = useRef<number | null>(null);
+
+  // On focus: sync state + guard onboarding
   useFocusEffect(useCallback(() => {
     reloadHistory();
+    reloadGoals();
     AsyncStorage.getItem(USER_PROFILE_KEY).then((raw) => {
-      const profile = raw ? JSON.parse(raw) : null;
-      if (!profile?.onboardingComplete) {
+      if (!(raw && JSON.parse(raw).onboardingComplete)) {
         router.replace('/calorie-onboarding');
       }
     });
-  }, [reloadHistory]));
+  }, [reloadHistory, reloadGoals]));
 
-  // Celebration when new entry added
+  // Celebrate on new entry
   useEffect(() => {
     if (!loaded) return;
     const count = todayLog.entries.length;
     if (prevCount.current !== null && count > prevCount.current) {
       const newest = todayLog.entries[count - 1];
-      triggerToast(`${newest.name} · +${newest.calories} kcal logged!`);
+      showToast(`${newest.name} · +${newest.calories} kcal logged!`);
     }
     prevCount.current = count;
   }, [todayLog.entries.length, loaded]);
 
-  function triggerToast(msg: string) {
+  function showToast(msg: string) {
     setToast(msg);
     toastAnim.setValue(0);
     Animated.sequence([
@@ -271,7 +340,8 @@ export default function CaloriesScreen() {
     if (status !== 'granted') { Alert.alert('Camera access needed', 'Allow in Settings.'); return; }
     const res = await ImagePicker.launchCameraAsync({ quality: 0.8 });
     if (!res.canceled && res.assets[0]) {
-      pendingImage.uri = res.assets[0].uri; pendingImage.mimeType = res.assets[0].mimeType ?? 'image/jpeg';
+      const a = res.assets[0];
+      pendingImage.uri = a.uri; pendingImage.mimeType = a.mimeType ?? 'image/jpeg';
       router.push('/calorie-result');
     }
   }
@@ -281,37 +351,29 @@ export default function CaloriesScreen() {
     if (status !== 'granted') { Alert.alert('Photo access needed', 'Allow in Settings.'); return; }
     const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.8 });
     if (!res.canceled && res.assets[0]) {
-      pendingImage.uri = res.assets[0].uri; pendingImage.mimeType = res.assets[0].mimeType ?? 'image/jpeg';
+      const a = res.assets[0];
+      pendingImage.uri = a.uri; pendingImage.mimeType = a.mimeType ?? 'image/jpeg';
       router.push('/calorie-result');
     }
-  }
-
-  function resetOnboarding() {
-    AsyncStorage.removeItem(USER_PROFILE_KEY).then(() => router.push('/calorie-onboarding'));
   }
 
   if (!loaded) return <View style={s.center}><Text style={s.loadTxt}>Loading…</Text></View>;
 
   const totals    = dayTotals(todayLog);
   const mainColor = calorieColor(totals.calories, goals.calories);
-  const todayDate = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+  const dateLabel = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
 
   return (
     <SafeAreaView style={s.safe} edges={['bottom']}>
       <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
 
-        {/* Header */}
+        {/* Header — date only, no gear icon */}
         <View style={s.header}>
-          <View>
-            <Text style={s.headerDate}>{todayDate}</Text>
-            <Text style={s.headerSub}>Calorie Tracker</Text>
-          </View>
-          <TouchableOpacity onPress={() => setGoalsOpen(true)} style={s.gearBtn}>
-            <Text style={s.gearTxt}>⚙️</Text>
-          </TouchableOpacity>
+          <Text style={s.headerDate}>{dateLabel}</Text>
+          <Text style={s.headerSub}>Calorie Tracker</Text>
         </View>
 
-        {/* Donut ring hero */}
+        {/* Donut ring */}
         <View style={s.heroCard}>
           <DonutRing current={totals.calories} goal={goals.calories} color={mainColor} size={190} />
         </View>
@@ -323,7 +385,7 @@ export default function CaloriesScreen() {
           <MacroChip label="Fat"     value={totals.fat}      goal={goals.fat}     color="#f87171" />
         </View>
 
-        {/* Scan buttons */}
+        {/* Scan row */}
         <View style={s.scanRow}>
           <TouchableOpacity style={s.scanMain} onPress={openCamera}>
             <Text style={s.scanIcon}>📷</Text>
@@ -335,6 +397,12 @@ export default function CaloriesScreen() {
           </TouchableOpacity>
         </View>
 
+        {/* Add manually button */}
+        <TouchableOpacity style={s.addManualBtn} onPress={() => setAddManual(true)}>
+          <Text style={s.addManualIcon}>＋</Text>
+          <Text style={s.addManualTxt}>Add Manually</Text>
+        </TouchableOpacity>
+
         {/* Today's log */}
         <View style={s.logCard}>
           <View style={s.logHeader}>
@@ -345,21 +413,31 @@ export default function CaloriesScreen() {
             <View style={s.empty}>
               <Text style={s.emptyIcon}>🍽️</Text>
               <Text style={s.emptyTxt}>No meals logged yet</Text>
-              <Text style={s.emptySub}>Tap Scan Food to log your first meal</Text>
+              <Text style={s.emptySub}>Tap Scan Food or Add Manually to get started</Text>
             </View>
           ) : (
             [...todayLog.entries].reverse().map((entry) => (
-              <EntryRow key={entry.id} entry={entry} onPress={() => setEditEntry(entry)} />
+              <EntryRow
+                key={entry.id}
+                entry={entry}
+                onEdit={() => setEditEntry(entry)}
+                onDelete={() => removeHistoryEntry(entry.date, entry.id)}
+              />
             ))
           )}
         </View>
 
-        {/* Progress & History button */}
-        <TouchableOpacity style={s.historyBtn} onPress={() => router.push('/calorie-progress')}>
-          <Text style={s.historyBtnIcon}>📊</Text>
-          <Text style={s.historyBtnTxt}>View Progress & History</Text>
-          <Text style={s.historyBtnArrow}>→</Text>
-        </TouchableOpacity>
+        {/* Bottom nav buttons */}
+        <View style={s.bottomRow}>
+          <TouchableOpacity style={[s.bottomBtn, s.bottomBtnPrimary]} onPress={() => router.push('/calorie-progress')}>
+            <Text style={s.bottomBtnIcon}>📊</Text>
+            <Text style={s.bottomBtnTxt}>Progress</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[s.bottomBtn, s.bottomBtnSecondary]} onPress={() => router.push('/calorie-settings')}>
+            <Text style={s.bottomBtnIcon}>⚙️</Text>
+            <Text style={[s.bottomBtnTxt, { color: '#94a3b8' }]}>Settings</Text>
+          </TouchableOpacity>
+        </View>
 
       </ScrollView>
 
@@ -367,21 +445,15 @@ export default function CaloriesScreen() {
       {toast && (
         <Animated.View style={[s.toast, {
           opacity:   toastAnim,
-          transform: [{ scale: toastAnim.interpolate({ inputRange: [0,1], outputRange: [0.9,1] }) }],
+          transform: [{ scale: toastAnim.interpolate({ inputRange: [0, 1], outputRange: [0.9, 1] }) }],
         }]}>
           <Text style={s.toastIcon}>✓</Text>
           <Text style={s.toastTxt} numberOfLines={1}>{toast}</Text>
         </Animated.View>
       )}
 
-      {/* Goals modal */}
-      <GoalsModal
-        visible={goalsOpen}
-        goals={goals}
-        onSave={updateGoals}
-        onClose={() => setGoalsOpen(false)}
-        onResetOnboarding={resetOnboarding}
-      />
+      {/* Add manually modal */}
+      {addManual && <AddManualModal onAdd={addEntry} onClose={() => setAddManual(false)} />}
 
       {/* Edit entry modal */}
       {editEntry && (
@@ -397,43 +469,46 @@ export default function CaloriesScreen() {
 }
 
 const s = StyleSheet.create({
-  safe:        { flex: 1, backgroundColor: '#111827' },
-  center:      { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#111827' },
-  loadTxt:     { color: '#64748b', fontSize: 15 },
-  scroll:      { padding: 16, gap: 12, paddingBottom: 40 },
+  safe:             { flex: 1, backgroundColor: '#111827' },
+  center:           { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#111827' },
+  loadTxt:          { color: '#64748b', fontSize: 15 },
+  scroll:           { padding: 16, gap: 12, paddingBottom: 40 },
 
-  header:      { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
-  headerDate:  { fontSize: 20, fontWeight: '800', color: '#f1f5f9' },
-  headerSub:   { fontSize: 12, color: '#64748b', marginTop: 2 },
-  gearBtn:     { padding: 8, backgroundColor: '#1e293b', borderRadius: 10 },
-  gearTxt:     { fontSize: 18 },
+  header:           { gap: 2 },
+  headerDate:       { fontSize: 20, fontWeight: '800', color: '#f1f5f9' },
+  headerSub:        { fontSize: 12, color: '#64748b' },
 
-  heroCard:    { backgroundColor: '#1e293b', borderRadius: 24, padding: 20, alignItems: 'center' },
+  heroCard:         { backgroundColor: '#1e293b', borderRadius: 24, padding: 20, alignItems: 'center' },
+  macroRow:         { flexDirection: 'row', gap: 8 },
 
-  macroRow:    { flexDirection: 'row', gap: 8 },
+  scanRow:          { flexDirection: 'row', gap: 10 },
+  scanMain:         { flex: 3, backgroundColor: '#10b981', borderRadius: 16, paddingVertical: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
+  scanIcon:         { fontSize: 22 },
+  scanTxt:          { fontSize: 16, fontWeight: '800', color: '#fff' },
+  scanLib:          { flex: 1, backgroundColor: '#1e293b', borderRadius: 16, paddingVertical: 18, alignItems: 'center', justifyContent: 'center', gap: 4 },
+  scanLibTxt:       { fontSize: 11, fontWeight: '600', color: '#94a3b8' },
 
-  scanRow:     { flexDirection: 'row', gap: 10 },
-  scanMain:    { flex: 3, backgroundColor: '#10b981', borderRadius: 16, paddingVertical: 18, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8 },
-  scanIcon:    { fontSize: 22 },
-  scanTxt:     { fontSize: 16, fontWeight: '800', color: '#fff' },
-  scanLib:     { flex: 1, backgroundColor: '#1e293b', borderRadius: 16, paddingVertical: 18, alignItems: 'center', justifyContent: 'center', gap: 4 },
-  scanLibTxt:  { fontSize: 11, fontWeight: '600', color: '#94a3b8' },
+  addManualBtn:     { backgroundColor: '#1e293b', borderRadius: 14, paddingVertical: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderWidth: 1, borderColor: '#334155' },
+  addManualIcon:    { fontSize: 18, color: '#10b981', fontWeight: '700' },
+  addManualTxt:     { fontSize: 14, fontWeight: '700', color: '#94a3b8' },
 
-  logCard:     { backgroundColor: '#1e293b', borderRadius: 20, padding: 16 },
-  logHeader:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
-  logTitle:    { fontSize: 15, fontWeight: '700', color: '#f1f5f9' },
-  logCount:    { fontSize: 12, color: '#64748b' },
-  empty:       { alignItems: 'center', paddingVertical: 28, gap: 6 },
-  emptyIcon:   { fontSize: 36 },
-  emptyTxt:    { fontSize: 15, color: '#475569', fontWeight: '600' },
-  emptySub:    { fontSize: 12, color: '#334155', textAlign: 'center' },
+  logCard:          { backgroundColor: '#1e293b', borderRadius: 20, padding: 16 },
+  logHeader:        { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+  logTitle:         { fontSize: 15, fontWeight: '700', color: '#f1f5f9' },
+  logCount:         { fontSize: 12, color: '#64748b' },
+  empty:            { alignItems: 'center', paddingVertical: 28, gap: 6 },
+  emptyIcon:        { fontSize: 36 },
+  emptyTxt:         { fontSize: 15, color: '#475569', fontWeight: '600' },
+  emptySub:         { fontSize: 12, color: '#334155', textAlign: 'center' },
 
-  historyBtn:  { backgroundColor: '#1e293b', borderRadius: 16, padding: 18, flexDirection: 'row', alignItems: 'center', gap: 10 },
-  historyBtnIcon:{ fontSize: 20 },
-  historyBtnTxt: { flex: 1, fontSize: 15, fontWeight: '700', color: '#f1f5f9' },
-  historyBtnArrow: { fontSize: 18, color: '#10b981', fontWeight: '700' },
+  bottomRow:        { flexDirection: 'row', gap: 10 },
+  bottomBtn:        { flex: 1, borderRadius: 16, paddingVertical: 16, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8 },
+  bottomBtnPrimary: { backgroundColor: '#1e293b' },
+  bottomBtnSecondary:{ backgroundColor: '#1e293b' },
+  bottomBtnIcon:    { fontSize: 18 },
+  bottomBtnTxt:     { fontSize: 14, fontWeight: '700', color: '#f1f5f9' },
 
-  toast:       { position: 'absolute', bottom: 24, left: 16, right: 16, backgroundColor: '#10b981', borderRadius: 16, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 10, shadowColor: '#10b981', shadowOpacity: 0.4, shadowRadius: 12, shadowOffset: { width: 0, height: 4 } },
-  toastIcon:   { fontSize: 20 },
-  toastTxt:    { fontSize: 14, fontWeight: '700', color: '#fff', flex: 1 },
+  toast:            { position: 'absolute', bottom: 24, left: 16, right: 16, backgroundColor: '#10b981', borderRadius: 16, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 10, shadowColor: '#10b981', shadowOpacity: 0.4, shadowRadius: 12, shadowOffset: { width: 0, height: 4 } },
+  toastIcon:        { fontSize: 20 },
+  toastTxt:         { fontSize: 14, fontWeight: '700', color: '#fff', flex: 1 },
 });
