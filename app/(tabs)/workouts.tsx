@@ -733,7 +733,10 @@ export default function WorkoutsScreen() {
       <ScrollView contentContainerStyle={styles.scroll}>
         {activePlan && (
           <>
-            <TouchableOpacity onPress={() => setView('plans')} style={styles.backBtn}>
+            <TouchableOpacity
+              onPress={() => setView(activePlan.level === 'personalized' ? 'personalized' : 'plans')}
+              style={styles.backBtn}
+            >
               <Text style={styles.backBtnText}>← Back</Text>
             </TouchableOpacity>
             <View style={styles.planHeader}>
