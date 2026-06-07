@@ -249,15 +249,6 @@ function EntryRow({ entry, onEdit, onDelete }: {
   onEdit:   () => void;
   onDelete: () => void;
 }) {
-  function confirmDelete() {
-    Alert.alert('Delete?', entry.name, [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: onDelete },
-    ]);
-  }
-
-  // Use a plain View so the delete button is not nested inside another Touchable.
-  // Nested touchables on iOS allow the outer one to swallow the tap before the inner fires.
   return (
     <View style={er.row}>
       <TouchableOpacity style={er.content} onPress={onEdit} activeOpacity={0.7}>
@@ -269,7 +260,7 @@ function EntryRow({ entry, onEdit, onDelete }: {
         <Text style={er.kcal}>{entry.calories} kcal</Text>
       </TouchableOpacity>
       <TouchableOpacity
-        onPress={confirmDelete}
+        onPress={onDelete}
         hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
         style={er.delBtn}
       >
