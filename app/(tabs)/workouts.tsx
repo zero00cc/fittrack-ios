@@ -175,7 +175,10 @@ export default function WorkoutsScreen() {
   }
 
   // Called after every status change; saves history and shows modal if plan is complete
-  function checkPlanCompletion(updatedStatus: Record<number, DayStatus>) {
+  function checkPlanCompletion(
+    updatedStatus: Record<number, DayStatus>,
+    justFinishedDay?: { dayNumber: number; date?: string },
+  ) {
     if (!activePlan || !workoutState.progress) return;
     const allDone = trainingDays.every((d) => {
       const s = updatedStatus[d.dayNumber];
@@ -199,10 +202,12 @@ export default function WorkoutsScreen() {
         dayNumber:      d.dayNumber,
         label:          d.label,
         status:         updatedStatus[d.dayNumber] ?? 'unfinished',
-        completionDate: workoutState.progress!.completionDates?.[d.dayNumber],
+        completionDate: (justFinishedDay?.dayNumber === d.dayNumber ? justFinishedDay.date : undefined)
+                        ?? workoutState.progress!.completionDates?.[d.dayNumber],
       })),
     };
-    setCompletedRecord(record);
+    recordCompletedPlan(record); // persist to AsyncStorage + Supabase immediately
+    setCompletedRecord(record);  // show celebration modal
   }
 
   // Tap on an unlogged date in daily mode → confirm "Add?"
@@ -233,7 +238,7 @@ export default function WorkoutsScreen() {
     if (allDone) {
       updateDayStatus(dayNumber, 'finished', selectedWorkoutDate ?? undefined);
       const newStatus = { ...(workoutState.progress?.dayStatus ?? {}), [dayNumber]: 'finished' as DayStatus };
-      checkPlanCompletion(newStatus);
+      checkPlanCompletion(newStatus, { dayNumber, date: selectedWorkoutDate ?? undefined });
     } else if (currentStatus === 'finished') {
       updateDayStatus(dayNumber, 'unfinished');
     }
@@ -498,7 +503,7 @@ export default function WorkoutsScreen() {
                 updateDayStatus(dn, 'skipped', selectedWorkoutDate ?? undefined);
                 setSelectedDay(null); setSelectedWorkoutDate(null); setShowStopwatch(false);
                 const newStatus = { ...(workoutState.progress?.dayStatus ?? {}), [dn]: 'skipped' as DayStatus };
-                checkPlanCompletion(newStatus);
+                checkPlanCompletion(newStatus, { dayNumber: dn, date: undefined });
               }}>
                 <Text style={styles.skipBtn}>Skip</Text>
               </TouchableOpacity>
@@ -534,7 +539,7 @@ export default function WorkoutsScreen() {
                   updateDayStatus(dn, 'finished', selectedWorkoutDate ?? undefined);
                   setSelectedDay(null); setSelectedWorkoutDate(null); setShowStopwatch(false);
                   const newStatus = { ...(workoutState.progress?.dayStatus ?? {}), [dn]: 'finished' as DayStatus };
-                  checkPlanCompletion(newStatus);
+                  checkPlanCompletion(newStatus, { dayNumber: dn, date: selectedWorkoutDate ?? undefined });
                 }}
               >
                 <Text style={styles.completeBtnText}>✓ Mark as Completed</Text>
@@ -652,7 +657,6 @@ export default function WorkoutsScreen() {
               <TouchableOpacity
                 style={styles.celebrationBtn}
                 onPress={() => {
-                  recordCompletedPlan(completedRecord);
                   setCompletedRecord(null);
                   setView('level');
                 }}
@@ -662,7 +666,6 @@ export default function WorkoutsScreen() {
               <TouchableOpacity
                 style={styles.celebrationSecondary}
                 onPress={() => {
-                  recordCompletedPlan(completedRecord);
                   setCompletedRecord(null);
                   setView('history');
                 }}
