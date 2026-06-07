@@ -13,6 +13,7 @@ import { Stopwatch } from '../../components/workout/Stopwatch';
 import {
   TrainingLevel,
   WorkoutDay,
+  WorkoutPlan,
   DayStatus,
   Exercise,
   SetBlock,
@@ -27,9 +28,10 @@ type DailyDateConfirm =
   | { type: 'remove'; dateYMD: string; dayNumber: number; dayLabel: string };
 
 const LEVELS: Array<{ id: TrainingLevel; label: string; icon: string; desc: string; color: string; border: string }> = [
-  { id: 'beginner', label: 'Beginner', icon: '🌱', desc: 'New to weight training. Plans focused on building a movement foundation.', color: '#f0fdf4', border: '#4ade80' },
-  { id: 'intermediate', label: 'Intermediate', icon: '⚡', desc: '6+ months of training. Structured progressive overload.', color: '#eff6ff', border: '#60a5fa' },
-  { id: 'professional', label: 'Professional', icon: '🏆', desc: 'Advanced lifter. High-intensity programs including Meta 5/3/1.', color: '#faf5ff', border: '#c084fc' },
+  { id: 'beginner',     label: 'Beginner',          icon: '🌱', desc: 'New to weight training. Plans focused on building a movement foundation.', color: '#f0fdf4', border: '#4ade80' },
+  { id: 'intermediate', label: 'Intermediate',       icon: '⚡', desc: '6+ months of training. Structured progressive overload.',                  color: '#eff6ff', border: '#60a5fa' },
+  { id: 'professional', label: 'Professional',       icon: '🏆', desc: 'Advanced lifter. High-intensity programs including Meta 5/3/1.',           color: '#faf5ff', border: '#c084fc' },
+  { id: 'personalized', label: 'Personalized Plans', icon: '✏️', desc: 'Build your own plan by choosing exercises from the library day by day.',   color: '#fff7ed', border: '#fb923c' },
 ];
 
 const STATUS_LABELS: Record<DayStatus, string> = { finished: '✓ Done', skipped: '– Skipped', unfinished: 'Pending' };
@@ -71,9 +73,11 @@ export default function WorkoutsScreen() {
     resetDayProgress,
     resetPlan,
     recordCompletedPlan,
+    savePersonalizedPlan,
+    deletePersonalizedPlan,
   } = useWorkoutStore();
 
-  const [view, setView] = useState<'level' | 'plans' | 'setup' | 'detail' | 'history'>('level');
+  const [view, setView] = useState<'level' | 'plans' | 'setup' | 'detail' | 'history' | 'personalized' | 'personalized-edit'>('level');
   const [completedRecord, setCompletedRecord] = useState<CompletedPlan | null>(null);
   const [selectedDay, setSelectedDay] = useState<WorkoutDay | null>(null);
   const [showPicker, setShowPicker] = useState(false);
@@ -87,6 +91,15 @@ export default function WorkoutsScreen() {
   const [pendingDayDates, setPendingDayDates] = useState<Record<number, string>>({});
   const [dailyDateConfirm, setDailyDateConfirm] = useState<DailyDateConfirm | null>(null);
   const [showStopwatch, setShowStopwatch] = useState(false);
+  // Personalized plan state
+  const [showCreatePlan,    setShowCreatePlan]    = useState(false);
+  const [newPlanName,       setNewPlanName]       = useState('');
+  const [newPlanDays,       setNewPlanDays]       = useState('');
+  const [editingPlan,       setEditingPlan]       = useState<WorkoutPlan | null>(null);
+  const [editingDayNum,     setEditingDayNum]     = useState<number | null>(null);
+  const [showEditPicker,    setShowEditPicker]    = useState(false);
+  const [editPickerSearch,  setEditPickerSearch]  = useState('');
+  const [confirmDeleteId,   setConfirmDeleteId]   = useState<string | null>(null);
 
   // These must stay above any early return to satisfy Rules of Hooks
   const dayExerciseIds = useMemo(() => {
@@ -105,13 +118,67 @@ export default function WorkoutsScreen() {
     );
   }, [pickerSearch]);
 
+  const filteredEditLibrary = useMemo(() => {
+    const q = editPickerSearch.toLowerCase();
+    return libraryExercises.filter(
+      (e) =>
+        e.name.toLowerCase().includes(q) ||
+        e.muscleGroups.some((m) => m.toLowerCase().includes(q)),
+    );
+  }, [editPickerSearch]);
+
+  const editDayExerciseIds = useMemo(() => {
+    if (!editingPlan || editingDayNum === null) return new Set<string>();
+    const day = editingPlan.days.find((d) => d.dayNumber === editingDayNum);
+    return new Set((day?.exercises ?? []).map((e) => e.id));
+  }, [editingPlan, editingDayNum]);
+
+  function addExerciseToEditDay(lib: (typeof libraryExercises)[number]) {
+    if (!editingPlan || editingDayNum === null) return;
+    const slug = lib.name.toLowerCase().replace(/\s+/g, '+').replace(/[()]/g, '');
+    const exercise: Exercise = {
+      id: lib.id,
+      name: lib.name,
+      youtubeUrl: `https://www.youtube.com/results?search_query=how+to+${slug}+proper+form`,
+      setBlocks: [{ sets: 3, reps: null, rpe: null, load: null }],
+    };
+    setEditingPlan((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        days: prev.days.map((d) =>
+          d.dayNumber === editingDayNum
+            ? { ...d, exercises: d.exercises.some((e) => e.id === exercise.id) ? d.exercises : [...d.exercises, exercise] }
+            : d,
+        ),
+      };
+    });
+  }
+
+  function removeExerciseFromEditDay(exerciseId: string) {
+    if (!editingPlan || editingDayNum === null) return;
+    setEditingPlan((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        days: prev.days.map((d) =>
+          d.dayNumber === editingDayNum
+            ? { ...d, exercises: d.exercises.filter((e) => e.id !== exerciseId) }
+            : d,
+        ),
+      };
+    });
+  }
+
   if (!loaded) return <View style={styles.center}><Text style={styles.loading}>Loading…</Text></View>;
 
   const filteredPlans = workoutState.selectedLevel
     ? workoutPlans.filter((p) => p.level === workoutState.selectedLevel)
     : [];
 
-  const activePlan = workoutPlans.find((p) => p.id === workoutState.activePlanId) ?? null;
+  const activePlan = workoutPlans.find((p) => p.id === workoutState.activePlanId)
+    ?? (workoutState.personalizedPlans ?? []).find((p) => p.id === workoutState.activePlanId)
+    ?? null;
   const trainingDays = activePlan?.days.filter((d) => !d.isRestDay) ?? [];
 
   // Apply custom set blocks and append custom exercises for a given day
@@ -135,7 +202,7 @@ export default function WorkoutsScreen() {
 
   function handleSelectLevel(level: TrainingLevel) {
     setLevel(level);
-    setView('plans');
+    setView(level === 'personalized' ? 'personalized' : 'plans');
   }
 
   function handleSelectPlan(planId: string) {
@@ -248,6 +315,251 @@ export default function WorkoutsScreen() {
     }
   }
 
+
+  // ── Personalized plans list ─────────────────────────────────────
+  if (view === 'personalized') {
+    const myPlans = workoutState.personalizedPlans ?? [];
+    return (
+      <SafeAreaView style={styles.safe} edges={['bottom']}>
+        <ScrollView contentContainerStyle={styles.scroll}>
+          <TouchableOpacity onPress={() => setView('level')} style={styles.backBtn}>
+            <Text style={styles.backBtnText}>← Back</Text>
+          </TouchableOpacity>
+          <Text style={styles.pageTitle}>My Plans</Text>
+
+          {myPlans.length === 0 ? (
+            <View style={styles.emptyCard}>
+              <Text style={styles.emptyIcon}>📋</Text>
+              <Text style={styles.emptyTitle}>No plans yet</Text>
+              <Text style={styles.emptyDesc}>Create your first personalized workout plan below.</Text>
+            </View>
+          ) : (
+            myPlans.map((plan) => {
+              const isActive   = workoutState.activePlanId === plan.id;
+              const daysSetUp  = plan.days.filter((d) => d.exercises.length > 0).length;
+              return (
+                <View key={plan.id} style={styles.persCard}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.persName}>{plan.name}</Text>
+                    <Text style={styles.persInfo}>{plan.days.length} days · {daysSetUp}/{plan.days.length} configured</Text>
+                    {isActive && <Text style={styles.persActiveTag}>● Active</Text>}
+                  </View>
+                  <View style={styles.persActions}>
+                    <TouchableOpacity
+                      style={styles.persEditBtn}
+                      onPress={() => { setEditingPlan(plan); setView('personalized-edit'); }}
+                    >
+                      <Text style={styles.persEditText}>Edit</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.persActivateBtn}
+                      onPress={() => {
+                        if (isActive) { setView('detail'); return; }
+                        activatePlan(plan.id, plan.defaultWeeklySchedule, 'daily');
+                        setView('detail');
+                      }}
+                    >
+                      <Text style={styles.persActivateText}>{isActive ? 'View' : 'Start'}</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.persDeleteBtn}
+                      onPress={() => setConfirmDeleteId(plan.id)}
+                    >
+                      <Text style={styles.persDeleteText}>Delete</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              );
+            })
+          )}
+
+          <TouchableOpacity
+            style={styles.createPlanBtn}
+            onPress={() => { setNewPlanName(''); setNewPlanDays(''); setShowCreatePlan(true); }}
+          >
+            <Text style={styles.createPlanText}>+ Create New Plan</Text>
+          </TouchableOpacity>
+        </ScrollView>
+
+        {/* Create plan modal */}
+        {showCreatePlan && (
+          <Modal visible transparent animationType="fade">
+            <View style={styles.createOverlay}>
+              <View style={styles.createCard}>
+                <Text style={styles.createTitle}>New Personalized Plan</Text>
+                <Text style={styles.createLabel}>Plan Name</Text>
+                <TextInput
+                  style={styles.createInput}
+                  value={newPlanName}
+                  onChangeText={setNewPlanName}
+                  placeholder="e.g. My Strength Plan"
+                  placeholderTextColor="#9ca3af"
+                />
+                <Text style={styles.createLabel}>Total Training Days</Text>
+                <TextInput
+                  style={styles.createInput}
+                  value={newPlanDays}
+                  onChangeText={setNewPlanDays}
+                  placeholder="e.g. 12"
+                  placeholderTextColor="#9ca3af"
+                  keyboardType="number-pad"
+                />
+                <View style={styles.createBtns}>
+                  <TouchableOpacity style={styles.createCancelBtn} onPress={() => setShowCreatePlan(false)}>
+                    <Text style={styles.createCancelText}>Cancel</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.createConfirmBtn}
+                    onPress={() => {
+                      const n = parseInt(newPlanDays, 10);
+                      if (!newPlanName.trim() || !n || n < 1 || n > 60) return;
+                      const plan: WorkoutPlan = {
+                        id:                    generateId(),
+                        name:                  newPlanName.trim(),
+                        level:                 'personalized',
+                        durationWeeks:         Math.ceil(n / 3),
+                        description:           'Custom personalized plan',
+                        defaultWeeklySchedule: [1, 3, 5],
+                        days: Array.from({ length: n }, (_, i) => ({
+                          dayNumber:  i + 1,
+                          weekNumber: Math.ceil((i + 1) / 3),
+                          label:      `Day ${i + 1}`,
+                          isRestDay:  false,
+                          exercises:  [],
+                        })),
+                      };
+                      setShowCreatePlan(false);
+                      setEditingPlan(plan);
+                      setView('personalized-edit');
+                    }}
+                  >
+                    <Text style={styles.createConfirmText}>Create</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          </Modal>
+        )}
+
+        {/* Delete confirmation modal */}
+        {confirmDeleteId && (
+          <Modal visible transparent animationType="fade">
+            <View style={styles.createOverlay}>
+              <View style={styles.createCard}>
+                <Text style={styles.createTitle}>Delete Plan?</Text>
+                <Text style={{ color: '#6b7280', fontSize: 13, textAlign: 'center', marginBottom: 16 }}>
+                  This will permanently remove the plan and any active progress.
+                </Text>
+                <View style={styles.createBtns}>
+                  <TouchableOpacity style={styles.createCancelBtn} onPress={() => setConfirmDeleteId(null)}>
+                    <Text style={styles.createCancelText}>Cancel</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.createConfirmBtn, { backgroundColor: '#ef4444' }]}
+                    onPress={() => { deletePersonalizedPlan(confirmDeleteId); setConfirmDeleteId(null); }}
+                  >
+                    <Text style={styles.createConfirmText}>Delete</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          </Modal>
+        )}
+      </SafeAreaView>
+    );
+  }
+
+  // ── Personalized plan editor ────────────────────────────────────
+  if (view === 'personalized-edit' && editingPlan) {
+    return (
+      <SafeAreaView style={styles.safe} edges={['bottom']}>
+        <ScrollView contentContainerStyle={styles.scroll}>
+          <TouchableOpacity onPress={() => { setEditingPlan(null); setView('personalized'); }} style={styles.backBtn}>
+            <Text style={styles.backBtnText}>← Back</Text>
+          </TouchableOpacity>
+          <Text style={styles.pageTitle}>{editingPlan.name}</Text>
+          <Text style={styles.editPlanSubtitle}>Tap a day to add or remove exercises from the library.</Text>
+
+          {editingPlan.days.map((day) => (
+            <TouchableOpacity
+              key={day.dayNumber}
+              style={styles.editDayCard}
+              onPress={() => { setEditingDayNum(day.dayNumber); setEditPickerSearch(''); setShowEditPicker(true); }}
+              activeOpacity={0.75}
+            >
+              <View style={{ flex: 1 }}>
+                <Text style={styles.editDayLabel}>{day.label}</Text>
+                <Text style={styles.editDayCount}>
+                  {day.exercises.length > 0
+                    ? day.exercises.map((e) => e.name).join(' · ')
+                    : 'No exercises — tap to add'}
+                </Text>
+              </View>
+              <Text style={styles.editDayChevron}>›</Text>
+            </TouchableOpacity>
+          ))}
+
+          <TouchableOpacity
+            style={styles.saveBtn}
+            onPress={() => { savePersonalizedPlan(editingPlan); setEditingPlan(null); setView('personalized'); }}
+          >
+            <Text style={styles.saveBtnText}>Save Plan</Text>
+          </TouchableOpacity>
+        </ScrollView>
+
+        {/* Per-day exercise picker */}
+        {showEditPicker && editingDayNum !== null && (
+          <Modal visible animationType="slide" presentationStyle="pageSheet">
+            <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }}>
+              <View style={styles.modalHeader}>
+                <TouchableOpacity onPress={() => setShowEditPicker(false)}>
+                  <Text style={styles.modalCancel}>Cancel</Text>
+                </TouchableOpacity>
+                <Text style={styles.modalTitle} numberOfLines={1}>
+                  {editingPlan.days.find((d) => d.dayNumber === editingDayNum)?.label ?? `Day ${editingDayNum}`}
+                </Text>
+                <TouchableOpacity onPress={() => setShowEditPicker(false)} style={styles.pickerConfirmBtn}>
+                  <Text style={styles.pickerConfirmText}>Done</Text>
+                </TouchableOpacity>
+              </View>
+              <View style={styles.searchRow}>
+                <TextInput
+                  style={styles.searchInput}
+                  value={editPickerSearch}
+                  onChangeText={setEditPickerSearch}
+                  placeholder="Search exercises…"
+                  placeholderTextColor="#9ca3af"
+                  clearButtonMode="while-editing"
+                  autoFocus
+                />
+              </View>
+              <ScrollView contentContainerStyle={{ padding: 12 }}>
+                {filteredEditLibrary.map((lib) => {
+                  const added = editDayExerciseIds.has(lib.id);
+                  return (
+                    <TouchableOpacity
+                      key={lib.id}
+                      style={styles.pickerRow}
+                      onPress={() => added ? removeExerciseFromEditDay(lib.id) : addExerciseToEditDay(lib)}
+                      activeOpacity={0.7}
+                    >
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.pickerName}>{lib.name}</Text>
+                        <Text style={styles.pickerMuscles}>{lib.muscleGroups.join(' · ')}</Text>
+                      </View>
+                      {added
+                        ? <Text style={styles.pickerRemove}>✕ Remove</Text>
+                        : <Text style={styles.pickerAdd}>+ Add</Text>}
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            </SafeAreaView>
+          </Modal>
+        )}
+      </SafeAreaView>
+    );
+  }
 
   // ── Level selector ──────────────────────────────────────────────
   if (view === 'level') {
@@ -894,4 +1206,37 @@ const styles = StyleSheet.create({
   celebrationSecondaryText: { color: '#6366f1', fontWeight: '600', fontSize: 14 },
   celebrationHome: { width: '100%', paddingVertical: 10, alignItems: 'center' },
   celebrationHomeText: { color: '#9ca3af', fontWeight: '500', fontSize: 13 },
+  // Personalized plans list
+  persCard:        { backgroundColor: '#fff', borderRadius: 14, padding: 14, flexDirection: 'row', alignItems: 'center', gap: 10, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 6, shadowOffset: { width: 0, height: 2 } },
+  persName:        { fontSize: 14, fontWeight: '700', color: '#111827' },
+  persInfo:        { fontSize: 11, color: '#9ca3af', marginTop: 2 },
+  persActiveTag:   { fontSize: 11, color: '#10b981', fontWeight: '700', marginTop: 3 },
+  persActions:     { flexDirection: 'row', gap: 6 },
+  persEditBtn:     { backgroundColor: '#f3f4f6', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 },
+  persEditText:    { color: '#374151', fontSize: 12, fontWeight: '600' },
+  persActivateBtn: { backgroundColor: '#ecfdf5', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 },
+  persActivateText:{ color: '#10b981', fontSize: 12, fontWeight: '700' },
+  persDeleteBtn:   { backgroundColor: '#fee2e2', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 },
+  persDeleteText:  { color: '#ef4444', fontSize: 12, fontWeight: '700' },
+  createPlanBtn:   { marginTop: 4, borderRadius: 14, paddingVertical: 15, alignItems: 'center', backgroundColor: '#fff7ed', borderWidth: 1.5, borderColor: '#fb923c', borderStyle: 'dashed' },
+  createPlanText:  { color: '#ea580c', fontSize: 14, fontWeight: '700' },
+  // Create plan modal
+  createOverlay:   { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 32 },
+  createCard:      { width: '100%', backgroundColor: '#fff', borderRadius: 20, padding: 20, gap: 6 },
+  createTitle:     { fontSize: 17, fontWeight: '800', color: '#111827', textAlign: 'center', marginBottom: 8 },
+  createLabel:     { fontSize: 12, fontWeight: '600', color: '#6b7280', marginTop: 6 },
+  createInput:     { backgroundColor: '#f9fafb', borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10, fontSize: 14, color: '#111827', marginTop: 4 },
+  createBtns:      { flexDirection: 'row', gap: 10, marginTop: 14 },
+  createCancelBtn: { flex: 1, backgroundColor: '#f3f4f6', borderRadius: 12, paddingVertical: 12, alignItems: 'center' },
+  createCancelText:{ color: '#6b7280', fontSize: 14, fontWeight: '600' },
+  createConfirmBtn:{ flex: 1, backgroundColor: '#10b981', borderRadius: 12, paddingVertical: 12, alignItems: 'center' },
+  createConfirmText:{ color: '#fff', fontSize: 14, fontWeight: '700' },
+  // Plan editor
+  editPlanSubtitle:{ fontSize: 13, color: '#6b7280', marginBottom: 4 },
+  editDayCard:     { backgroundColor: '#fff', borderRadius: 12, padding: 14, flexDirection: 'row', alignItems: 'center', shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 4, shadowOffset: { width: 0, height: 1 } },
+  editDayLabel:    { fontSize: 13, fontWeight: '700', color: '#111827' },
+  editDayCount:    { fontSize: 11, color: '#9ca3af', marginTop: 3, flexShrink: 1 },
+  editDayChevron:  { fontSize: 20, color: '#d1d5db', marginLeft: 8 },
+  saveBtn:         { backgroundColor: '#10b981', borderRadius: 14, paddingVertical: 15, alignItems: 'center', marginTop: 8 },
+  saveBtnText:     { color: '#fff', fontWeight: '700', fontSize: 15 },
 });

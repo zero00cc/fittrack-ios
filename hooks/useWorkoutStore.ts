@@ -8,10 +8,11 @@ import { useAuth } from '../context/AuthContext';
 const WORKOUT_KEY = 'fittrack_workout_state';
 
 const defaultState: WorkoutState = {
-  selectedLevel: null,
-  activePlanId:  null,
-  progress:      null,
-  planHistory:   [],
+  selectedLevel:     null,
+  activePlanId:      null,
+  progress:          null,
+  planHistory:       [],
+  personalizedPlans: [],
 };
 
 export function useWorkoutStore() {
@@ -198,6 +199,29 @@ export function useWorkoutStore() {
     [setWorkoutState],
   );
 
+  const savePersonalizedPlan = useCallback(
+    (plan: WorkoutPlan) =>
+      setWorkoutState((prev) => {
+        const existing = prev.personalizedPlans ?? [];
+        const updated  = existing.some((p) => p.id === plan.id)
+          ? existing.map((p) => (p.id === plan.id ? plan : p))
+          : [...existing, plan];
+        return { ...prev, personalizedPlans: updated };
+      }),
+    [setWorkoutState],
+  );
+
+  const deletePersonalizedPlan = useCallback(
+    (planId: string) =>
+      setWorkoutState((prev) => ({
+        ...prev,
+        personalizedPlans: (prev.personalizedPlans ?? []).filter((p) => p.id !== planId),
+        activePlanId:      prev.activePlanId === planId ? null : prev.activePlanId,
+        progress:          prev.activePlanId === planId ? null : prev.progress,
+      })),
+    [setWorkoutState],
+  );
+
   // Save a completed plan to history then clear the active plan
   const recordCompletedPlan = useCallback(
     (record: CompletedPlan) =>
@@ -223,5 +247,7 @@ export function useWorkoutStore() {
     resetDayProgress,
     resetPlan,
     recordCompletedPlan,
+    savePersonalizedPlan,
+    deletePersonalizedPlan,
   };
 }

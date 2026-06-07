@@ -1,4 +1,4 @@
-export type TrainingLevel = 'beginner' | 'intermediate' | 'professional';
+export type TrainingLevel = 'beginner' | 'intermediate' | 'professional' | 'personalized';
 
 export type DayStatus = 'unfinished' | 'finished' | 'skipped';
 
@@ -86,8 +86,9 @@ export interface CompletedPlan {
 }
 
 export interface WorkoutState {
-  selectedLevel: TrainingLevel | null;
-  activePlanId: string | null;
-  progress: PlanProgress | null;
-  planHistory: CompletedPlan[];
+  selectedLevel:     TrainingLevel | null;
+  activePlanId:      string | null;
+  progress:          PlanProgress | null;
+  planHistory:       CompletedPlan[];
+  personalizedPlans: WorkoutPlan[];
 }
