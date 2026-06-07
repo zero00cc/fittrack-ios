@@ -20,6 +20,16 @@ CI=1 npx expo start --web --port 19006  # non-interactive browser mode
 npx tsc --noEmit
 ```
 
+## Environment variables
+
+Create a `.env` file in the project root (gitignored) with:
+
+```
+EXPO_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+EXPO_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+EXPO_PUBLIC_ANTHROPIC_KEY=sk-ant-...   # for SnapTrack food photo analysis
+```
+
 ## Architecture
 
 ### State & persistence — local-first with Supabase cloud sync
@@ -39,11 +49,19 @@ void supabase.from('table').upsert({...}).then(undefined, () => {});
 
 ### Auth flow
 
-`context/AuthContext.tsx` wraps Supabase auth. `signUp` returns `{ error, needsConfirmation }` — when `needsConfirmation` is true the user must click an email confirmation link before a session is created. `signOut` clears all `fittrack_*` AsyncStorage keys before calling `supabase.auth.signOut()`. The root `app/_layout.tsx` contains `AuthGate` which redirects unauthenticated users to `/(auth)/login`.
+`context/AuthContext.tsx` wraps Supabase auth. `signUp` returns `{ error, needsConfirmation }` — when `needsConfirmation` is true the user must click an email confirmation link before a session is created. `signOut` clears all `fittrack_*` AsyncStorage keys before calling `supabase.auth.signOut()`. The root `app/_layout.tsx` contains `AuthGate` which redirects unauthenticated users to `/(auth)/login`. The `(auth)` group only contains `login.tsx` — sign-up is handled on that same screen.
 
 ### Screens
 
-All tabs live in `app/(tabs)/`. `workouts.tsx` manages a 5-state internal view stack (`'level' | 'plans' | 'setup' | 'detail' | 'history'`) with its own modals rather than using router navigation.
+All tabs live in `app/(tabs)/`: `index`, `calories`, `workouts`, `exercises`, `gallery`, `ranking`.
+
+`workouts.tsx` manages a 5-state internal view stack (`'level' | 'plans' | 'setup' | 'detail' | 'history'`) with its own modals rather than using router navigation.
+
+### Workout plan system
+
+`WorkoutState.selectedLevel` is `'beginner' | 'intermediate' | 'professional' | 'personalized'`. Personalized plans are stored in `workoutState.personalizedPlans` (an array of `WorkoutPlan`) and managed via `savePersonalizedPlan` / `deletePersonalizedPlan` in `useWorkoutStore`.
+
+When a plan is activated, `PlanMode` is chosen: `'scheduled'` (each training day maps to a specific calendar date via `dateMap`) or `'daily'` (user marks days as done in order, no calendar constraint).
 
 ### Workout plan completion & history
 

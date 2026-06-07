@@ -50,9 +50,28 @@ export default function RootLayout() {
     <AuthProvider>
       <AuthGate />
       <Stack>
-        <Stack.Screen name="(tabs)"   options={{ headerShown: false }} />
-        <Stack.Screen name="(auth)"   options={{ headerShown: false }} />
-        <Stack.Screen name="modal"    options={{ presentation: 'modal' }} />
+        <Stack.Screen name="(tabs)"            options={{ headerShown: false }} />
+        <Stack.Screen name="(auth)"            options={{ headerShown: false }} />
+        <Stack.Screen name="modal"             options={{ presentation: 'modal' }} />
+        <Stack.Screen
+          name="calorie-result"
+          options={{
+            presentation:   'modal',
+            title:          'Meal Details',
+            headerStyle:    { backgroundColor: '#111827' },
+            headerTintColor: '#fff',
+            headerTitleStyle: { fontWeight: '700' },
+          }}
+        />
+        <Stack.Screen
+          name="calorie-progress"
+          options={{
+            title:          'Progress & History',
+            headerStyle:    { backgroundColor: '#111827' },
+            headerTintColor: '#fff',
+            headerTitleStyle: { fontWeight: '700' },
+          }}
+        />
       </Stack>
     </AuthProvider>
   );

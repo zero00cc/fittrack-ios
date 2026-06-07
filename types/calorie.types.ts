@@ -1,29 +1,27 @@
-export interface FoodItem {
+export interface MacroEntry {
   id: string;
+  date: string;       // YYYY-MM-DD
+  timestamp: string;  // ISO
   name: string;
-  caloriesPer100g: number;
-  category: 'protein' | 'carb' | 'fat' | 'vegetable' | 'fruit' | 'dairy' | 'other';
-}
-
-export interface MealEntry {
-  id: string;
-  foodId: string;
-  foodName: string;
-  weightGrams: number;
+  imageUri?: string;  // local file path
   calories: number;
-  timestamp: string;
+  protein: number;    // grams
+  carbs: number;      // grams
+  fat: number;        // grams
 }
 
 export interface DailyLog {
   date: string;
-  entries: MealEntry[];
-  totalCalories: number;
+  entries: MacroEntry[];
 }
 
 export interface CalorieHistory {
   [date: string]: DailyLog;
 }
 
-export interface CalorieSettings {
-  dailyTarget: number;
+export interface CalorieGoals {
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
 }

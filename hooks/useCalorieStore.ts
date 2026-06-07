@@ -1,96 +1,100 @@
 import { useCallback, useEffect, useRef } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAsyncStorage } from './useAsyncStorage';
-import { CalorieHistory, CalorieSettings, DailyLog, MealEntry } from '../types/calorie.types';
+import { CalorieHistory, CalorieGoals, MacroEntry } from '../types/calorie.types';
 import { todayYMD } from '../utils/dateUtils';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 
-const HISTORY_KEY  = 'fittrack_calorie_history';
-const SETTINGS_KEY = 'fittrack_calorie_settings';
+const HISTORY_KEY = 'fittrack_calorie_history';
+const GOALS_KEY   = 'fittrack_calorie_settings';
 
-const defaultHistory:  CalorieHistory  = {};
-const defaultSettings: CalorieSettings = { dailyTarget: 2000 };
+const defaultHistory: CalorieHistory = {};
+const defaultGoals: CalorieGoals     = { calories: 2000, protein: 150, carbs: 200, fat: 65 };
 
 export function useCalorieStore() {
   const { user } = useAuth();
-  const userRef = useRef(user);
+  const userRef   = useRef(user);
   userRef.current = user;
 
-  const [history,  setHistory,  historyLoaded]  = useAsyncStorage<CalorieHistory>(HISTORY_KEY,  defaultHistory);
-  const [settings, setSettings, settingsLoaded] = useAsyncStorage<CalorieSettings>(SETTINGS_KEY, defaultSettings);
+  const [history, setHistory, historyLoaded] = useAsyncStorage<CalorieHistory>(HISTORY_KEY, defaultHistory);
+  const [goals,   setGoals,   goalsLoaded]   = useAsyncStorage<CalorieGoals>(GOALS_KEY, defaultGoals);
 
-  // ── Pull from Supabase once when the user signs in ──────────────
+  // Pull from Supabase on sign-in
   useEffect(() => {
     if (!user) return;
     Promise.all([
       supabase.from('calorie_history').select('data').eq('user_id', user.id).single(),
       supabase.from('calorie_settings').select('daily_target').eq('user_id', user.id).single(),
     ]).then(([hRes, sRes]) => {
-      if (hRes.data?.data)     setHistory(hRes.data.data as CalorieHistory);
+      if (hRes.data?.data) setHistory(hRes.data.data as CalorieHistory);
       if (sRes.data?.daily_target !== undefined)
-        setSettings({ dailyTarget: sRes.data.daily_target });
+        setGoals((prev) => ({ ...defaultGoals, ...prev, calories: sRes.data!.daily_target }));
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
 
-  // ── Supabase push helpers ────────────────────────────────────────
-  function pushHistory(newHistory: CalorieHistory) {
+  function pushHistory(h: CalorieHistory) {
     const u = userRef.current;
     if (!u) return;
-    void supabase.from('calorie_history').upsert(
-      { user_id: u.id, data: newHistory, updated_at: new Date().toISOString() },
-      { onConflict: 'user_id' },
-    ).then(undefined, () => {});
+    void supabase.from('calorie_history')
+      .upsert({ user_id: u.id, data: h, updated_at: new Date().toISOString() }, { onConflict: 'user_id' })
+      .then(undefined, () => {});
   }
 
-  function pushSettings(dailyTarget: number) {
-    const u = userRef.current;
-    if (!u) return;
-    void supabase.from('calorie_settings').upsert(
-      { user_id: u.id, daily_target: dailyTarget, updated_at: new Date().toISOString() },
-      { onConflict: 'user_id' },
-    ).then(undefined, () => {});
-  }
-
-  // ── Actions ──────────────────────────────────────────────────────
-  const today = todayYMD();
-  const todayLog: DailyLog = history[today] ?? { date: today, entries: [] };
+  const today    = todayYMD();
+  const todayLog = history[today] ?? { date: today, entries: [] };
 
   const addEntry = useCallback(
-    (entry: MealEntry) => {
-      const current    = history[today] ?? { date: today, entries: [] };
-      const newHistory = { ...history, [today]: { ...current, entries: [...current.entries, entry] } };
-      setHistory(newHistory);
-      pushHistory(newHistory);
+    (entry: MacroEntry) => {
+      setHistory((prev) => {
+        const current    = prev[today] ?? { date: today, entries: [] };
+        const newHistory = { ...prev, [today]: { ...current, entries: [...current.entries, entry] } };
+        pushHistory(newHistory);
+        return newHistory;
+      });
     },
-    [history, setHistory, today, user?.id],
+    [setHistory, today],
   );
 
   const removeEntry = useCallback(
     (entryId: string) => {
-      const current    = history[today] ?? { date: today, entries: [] };
-      const newHistory = { ...history, [today]: { ...current, entries: current.entries.filter((e) => e.id !== entryId) } };
-      setHistory(newHistory);
-      pushHistory(newHistory);
+      setHistory((prev) => {
+        const current    = prev[today] ?? { date: today, entries: [] };
+        const newHistory = { ...prev, [today]: { ...current, entries: current.entries.filter((e) => e.id !== entryId) } };
+        pushHistory(newHistory);
+        return newHistory;
+      });
     },
-    [history, setHistory, today, user?.id],
+    [setHistory, today],
   );
 
-  const setTarget = useCallback(
-    (target: number) => {
-      setSettings({ ...settings, dailyTarget: target });
-      pushSettings(target);
+  const updateGoals = useCallback(
+    (newGoals: CalorieGoals) => {
+      setGoals(newGoals);
+      const u = userRef.current;
+      if (!u) return;
+      void supabase.from('calorie_settings')
+        .upsert({ user_id: u.id, daily_target: newGoals.calories, updated_at: new Date().toISOString() }, { onConflict: 'user_id' })
+        .then(undefined, () => {});
     },
-    [settings, setSettings, user?.id],
+    [setGoals],
   );
+
+  // Called by the main screen on focus to sync state written by the result screen
+  const reloadHistory = useCallback(async () => {
+    const raw = await AsyncStorage.getItem(HISTORY_KEY);
+    if (raw) setHistory(JSON.parse(raw) as CalorieHistory);
+  }, [setHistory]);
 
   return {
     history,
     todayLog,
-    settings,
-    loaded: historyLoaded && settingsLoaded,
+    goals,
+    loaded: historyLoaded && goalsLoaded,
     addEntry,
     removeEntry,
-    setTarget,
+    updateGoals,
+    reloadHistory,
   };
 }
