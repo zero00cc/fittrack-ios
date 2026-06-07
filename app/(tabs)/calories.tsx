@@ -256,31 +256,35 @@ function EntryRow({ entry, onEdit, onDelete }: {
     ]);
   }
 
+  // Use a plain View so the delete button is not nested inside another Touchable.
+  // Nested touchables on iOS allow the outer one to swallow the tap before the inner fires.
   return (
-    <TouchableOpacity style={er.row} onPress={onEdit} activeOpacity={0.75}>
-      {entry.imageUri ? <Image source={{ uri: entry.imageUri }} style={er.thumb} /> : null}
-      <View style={er.info}>
-        <Text style={er.name} numberOfLines={1}>{entry.name}</Text>
-        <Text style={er.macros}>P {entry.protein}g · C {entry.carbs}g · F {entry.fat}g</Text>
-      </View>
-      <Text style={er.kcal}>{entry.calories} kcal</Text>
-      {/* Direct delete button — no need to open edit modal */}
+    <View style={er.row}>
+      <TouchableOpacity style={er.content} onPress={onEdit} activeOpacity={0.7}>
+        {entry.imageUri ? <Image source={{ uri: entry.imageUri }} style={er.thumb} /> : null}
+        <View style={er.info}>
+          <Text style={er.name} numberOfLines={1}>{entry.name}</Text>
+          <Text style={er.macros}>P {entry.protein}g · C {entry.carbs}g · F {entry.fat}g</Text>
+        </View>
+        <Text style={er.kcal}>{entry.calories} kcal</Text>
+      </TouchableOpacity>
       <TouchableOpacity
         onPress={confirmDelete}
-        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
         style={er.delBtn}
       >
         <Text style={er.delTxt}>🗑</Text>
       </TouchableOpacity>
-    </TouchableOpacity>
+    </View>
   );
 }
 const er = StyleSheet.create({
-  row:    { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#0f172a', gap: 8 },
-  thumb:  { width: 40, height: 40, borderRadius: 8, resizeMode: 'cover' },
-  info:   { flex: 1 },
-  name:   { fontSize: 14, fontWeight: '600', color: '#f1f5f9' },
-  macros: { fontSize: 11, color: '#64748b', marginTop: 2 },
+  row:     { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#0f172a' },
+  content: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  thumb:   { width: 40, height: 40, borderRadius: 8, resizeMode: 'cover' },
+  info:    { flex: 1 },
+  name:    { fontSize: 14, fontWeight: '600', color: '#f1f5f9' },
+  macros:  { fontSize: 11, color: '#64748b', marginTop: 2 },
   kcal:   { fontSize: 14, fontWeight: '800', color: '#10b981' },
   delBtn: { padding: 4 },
   delTxt: { fontSize: 16 },
