@@ -45,6 +45,8 @@ export function useCalorieStore() {
   const today    = todayYMD();
   const todayLog = history[today] ?? { date: today, entries: [] };
 
+  // ── Add/remove for today ────────────────────────────────────────────────────
+
   const addEntry = useCallback(
     (entry: MacroEntry) => {
       setHistory((prev) => {
@@ -69,6 +71,40 @@ export function useCalorieStore() {
     [setHistory, today],
   );
 
+  // ── Edit / remove any historical entry ─────────────────────────────────────
+
+  const updateEntry = useCallback(
+    (date: string, entryId: string, updates: Partial<Pick<MacroEntry, 'name' | 'calories' | 'protein' | 'carbs' | 'fat'>>) => {
+      setHistory((prev) => {
+        const log        = prev[date] ?? { date, entries: [] };
+        const newHistory = {
+          ...prev,
+          [date]: { ...log, entries: log.entries.map((e) => e.id === entryId ? { ...e, ...updates } : e) },
+        };
+        pushHistory(newHistory);
+        return newHistory;
+      });
+    },
+    [setHistory],
+  );
+
+  const removeHistoryEntry = useCallback(
+    (date: string, entryId: string) => {
+      setHistory((prev) => {
+        const log        = prev[date] ?? { date, entries: [] };
+        const newHistory = {
+          ...prev,
+          [date]: { ...log, entries: log.entries.filter((e) => e.id !== entryId) },
+        };
+        pushHistory(newHistory);
+        return newHistory;
+      });
+    },
+    [setHistory],
+  );
+
+  // ── Goals ───────────────────────────────────────────────────────────────────
+
   const updateGoals = useCallback(
     (newGoals: CalorieGoals) => {
       setGoals(newGoals);
@@ -81,7 +117,9 @@ export function useCalorieStore() {
     [setGoals],
   );
 
-  // Called by the main screen on focus to sync state written by the result screen
+  // ── Cross-screen sync ───────────────────────────────────────────────────────
+  // Called by the main screen on focus to pick up entries added from result screen
+
   const reloadHistory = useCallback(async () => {
     const raw = await AsyncStorage.getItem(HISTORY_KEY);
     if (raw) setHistory(JSON.parse(raw) as CalorieHistory);
@@ -94,6 +132,8 @@ export function useCalorieStore() {
     loaded: historyLoaded && goalsLoaded,
     addEntry,
     removeEntry,
+    updateEntry,
+    removeHistoryEntry,
     updateGoals,
     reloadHistory,
   };

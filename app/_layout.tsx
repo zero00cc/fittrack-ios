@@ -54,6 +54,13 @@ export default function RootLayout() {
         <Stack.Screen name="(auth)"            options={{ headerShown: false }} />
         <Stack.Screen name="modal"             options={{ presentation: 'modal' }} />
         <Stack.Screen
+          name="calorie-onboarding"
+          options={{
+            headerShown: false,
+            presentation: 'fullScreenModal',
+          }}
+        />
+        <Stack.Screen
           name="calorie-result"
           options={{
             presentation:   'modal',
