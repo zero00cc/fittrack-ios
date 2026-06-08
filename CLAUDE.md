@@ -57,6 +57,28 @@ All tabs live in `app/(tabs)/`: `index`, `calories`, `workouts`, `exercises`, `g
 
 `workouts.tsx` manages a 5-state internal view stack (`'level' | 'plans' | 'setup' | 'detail' | 'history'`) with its own modals rather than using router navigation.
 
+**Non-tab stack screens** (registered in `app/_layout.tsx`):
+
+| Screen | Route | Purpose |
+|---|---|---|
+| `calorie-onboarding.tsx` | `fullScreenModal` | First-run BMR/TDEE setup — collects sex, age, weight, height, activity level, goal |
+| `calorie-settings.tsx` | push | Edit profile & recalculate goals; reads/writes `fittrack_user_profile` |
+| `calorie-progress.tsx` | push | Progress & History — 30-day chart and editable past logs |
+| `calorie-result.tsx` | modal | Meal details — shows AI-analyzed items from a food photo for review before saving |
+
+### Calorie onboarding & nutrition calculation
+
+`utils/nutritionCalc.ts` owns the BMR/TDEE math (Mifflin-St Jeor equation) and exports:
+- `UserProfile` — the user's body stats and goal; persisted at `fittrack_user_profile` in AsyncStorage (not synced to Supabase)
+- `calcPlan(profile)` — returns `CalorieGoals` (calories + protein/carbs/fat targets)
+- `ACTIVITY_OPTIONS`, `GOAL_OPTIONS` — used by both onboarding and settings screens
+
+`CalorieGoals` (in `types/calorie.types.ts`) now holds full macros: `{ calories, protein, carbs, fat }`. The `fittrack_calorie_settings` AsyncStorage key stores this shape. **Legacy format** (`{ dailyTarget }`) is normalised on read inside `useCalorieStore` — do not remove that normalisation.
+
+### Food photo analysis
+
+`utils/analyzeFood.ts` calls `claude-haiku-4-5-20251001` with a base64-encoded image. On web, it uses `fetch + FileReader` instead of `expo-file-system/legacy` (which throws on web). The result is an `AnalysisResult` with `items: AnalyzedItem[]`. The `calories.tsx` tab sets `pendingImage` (an exported module-level ref) before navigating to `calorie-result`, which reads it on mount.
+
 ### Workout plan system
 
 `WorkoutState.selectedLevel` is `'beginner' | 'intermediate' | 'professional' | 'personalized'`. Personalized plans are stored in `workoutState.personalizedPlans` (an array of `WorkoutPlan`) and managed via `savePersonalizedPlan` / `deletePersonalizedPlan` in `useWorkoutStore`.
@@ -75,12 +97,22 @@ Unlocked when `workoutState.planHistory.length > 0`. Uses IPF weight classes def
 
 `app.json` sets `"output": "single"` (SPA mode). Do not change to `"static"` — Supabase's AsyncStorage crashes the SSR render with `window is not defined`.
 
+## AsyncStorage keys
+
+| Key | Contents |
+|---|---|
+| `fittrack_calorie_history` | `CalorieHistory` — all daily meal logs keyed by `YYYY-MM-DD` |
+| `fittrack_calorie_settings` | `CalorieGoals` — `{ calories, protein, carbs, fat }` (legacy `{ dailyTarget }` is normalised on read) |
+| `fittrack_user_profile` | `UserProfile` — body stats and goal used for BMR/TDEE; not synced to Supabase |
+| `fittrack_workout_state` | `WorkoutState` — selected level, active plan ID, day status map, plan history |
+| `fittrack_gallery_meta` | Gallery item metadata (URIs, dates, categories) |
+
 ## Supabase tables
 
 | Table | Key columns | Notes |
 |---|---|---|
 | `calorie_history` | `user_id`, `data` (JSON blob), `updated_at` | entire history as one JSON value |
-| `calorie_settings` | `user_id`, `daily_target` | flat columns, not a JSON blob |
+| `calorie_settings` | `user_id`, `daily_target` | syncs only the calorie target (flat column, not full `CalorieGoals`) |
 | `workout_state` | `user_id`, `data` (JSON blob), `updated_at` | entire `WorkoutState` as JSON, includes `planHistory` |
 | `gallery_items` | `user_id`, `id`, `name`, `date`, `category`, `storage_path` | metadata only; images in Storage bucket `gallery` |
 | `leaderboard` | `user_id`, `gender`, `body_mass`, `squat`, `bench`, `deadlift`, `total` (generated), `weight_class` | one row per user, upsert on `user_id` |

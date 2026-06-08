@@ -57,8 +57,8 @@ export default function RootLayout() {
           name="calorie-settings"
           options={{
             title:           'Profile & Settings',
-            headerStyle:     { backgroundColor: '#111827' },
-            headerTintColor: '#fff',
+            headerStyle:     { backgroundColor: '#FCFBEA' },
+            headerTintColor: '#37260C',
             headerTitleStyle: { fontWeight: '700' },
           }}
         />
@@ -74,8 +74,8 @@ export default function RootLayout() {
           options={{
             presentation:   'modal',
             title:          'Meal Details',
-            headerStyle:    { backgroundColor: '#111827' },
-            headerTintColor: '#fff',
+            headerStyle:    { backgroundColor: '#FCFBEA' },
+            headerTintColor: '#37260C',
             headerTitleStyle: { fontWeight: '700' },
           }}
         />
@@ -83,8 +83,8 @@ export default function RootLayout() {
           name="calorie-progress"
           options={{
             title:          'Progress & History',
-            headerStyle:    { backgroundColor: '#111827' },
-            headerTintColor: '#fff',
+            headerStyle:    { backgroundColor: '#FCFBEA' },
+            headerTintColor: '#37260C',
             headerTitleStyle: { fontWeight: '700' },
           }}
         />

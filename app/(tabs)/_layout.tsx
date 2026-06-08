@@ -9,12 +9,12 @@ export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
-        headerStyle: { backgroundColor: '#111827' },
-        headerTintColor: '#fff',
-        headerTitleStyle: { fontWeight: '700' },
-        tabBarActiveTintColor: '#10b981',
-        tabBarInactiveTintColor: '#9ca3af',
-        tabBarStyle: { backgroundColor: '#fff', borderTopColor: '#e5e7eb' },
+        headerStyle: { backgroundColor: '#FCFBEA' },
+        headerTintColor: '#37260C',
+        headerTitleStyle: { fontWeight: '700', color: '#37260C', fontFamily: 'Helvetica Neue' },
+        tabBarActiveTintColor: '#37260C',
+        tabBarInactiveTintColor: '#AD8D1A',
+        tabBarStyle: { backgroundColor: '#FCFBEA', borderTopColor: '#E8D961' },
       }}
     >
       <Tabs.Screen
@@ -28,7 +28,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="calories"
         options={{
-          title: 'Calorie Tracker',
+          headerShown: false,
           tabBarLabel: 'Calories',
           tabBarIcon: ({ focused }) => <Icon label="🥗" focused={focused} />,
         }}
