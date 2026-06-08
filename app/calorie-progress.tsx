@@ -33,7 +33,7 @@ function fmtTick(v: number): string {
 
 // ── Calorie line chart ────────────────────────────────────────────────────────
 
-const CHART_H = 150; const Y_W = 44; const X_AXIS_H = 18;
+const CHART_H = 150; const Y_W = 44; const X_AXIS_H = 24;
 
 // Shared chart styles (used by both calorie and weight charts)
 const bc = StyleSheet.create({
@@ -113,15 +113,15 @@ function CalorieLineChart({ history, goals }: { history: any; goals: any }) {
                 );
               })}
             </View>
-            <View style={{ height: X_AXIS_H, position: 'relative' }}>
+            <View style={{ height: X_AXIS_H, flexDirection: 'row', borderTopWidth: 1, borderTopColor: BORDER }}>
               {days.map((d, i) => {
-                if (i % 5 !== 0) return null;
-                const dt = new Date(d + 'T00:00:00');
-                const lbl = `${dt.toLocaleDateString('en-US', { month: 'short' })} ${dt.getDate()}`;
+                const show = i % 5 === 0;
+                const dt   = new Date(d + 'T00:00:00');
+                const lbl  = show ? `${dt.toLocaleDateString('en-US', { month: 'short' })} ${dt.getDate()}` : '';
                 return (
-                  <Text key={d} style={{ position: 'absolute', left: i * W_SLOT, top: 3, fontSize: 8, color: MUTED, fontWeight: '600' }}>
-                    {lbl}
-                  </Text>
+                  <View key={d} style={{ width: W_SLOT, alignItems: 'flex-start', justifyContent: 'center' }}>
+                    {show && <Text style={{ fontSize: 9, color: MUTED, fontWeight: '600' }} numberOfLines={1}>{lbl}</Text>}
+                  </View>
                 );
               })}
             </View>
@@ -245,15 +245,15 @@ function WeightLineChart({ log, unit, onDayPress }: {
               />
             ))}
           </View>
-          <View style={{ height: X_AXIS_H, position: 'relative' }}>
+          <View style={{ height: X_AXIS_H, flexDirection: 'row', borderTopWidth: 1, borderTopColor: BORDER }}>
             {days.map((d, i) => {
-              if (i % 5 !== 0) return null;
-              const dt = new Date(d + 'T00:00:00');
-              const lbl = `${dt.toLocaleDateString('en-US', { month: 'short' })} ${dt.getDate()}`;
+              const show = i % 5 === 0;
+              const dt   = new Date(d + 'T00:00:00');
+              const lbl  = show ? `${dt.toLocaleDateString('en-US', { month: 'short' })} ${dt.getDate()}` : '';
               return (
-                <Text key={d} style={{ position: 'absolute', left: i * W_SLOT, top: 3, fontSize: 8, color: MUTED, fontWeight: '600' }}>
-                  {lbl}
-                </Text>
+                <View key={d} style={{ width: W_SLOT, alignItems: 'flex-start', justifyContent: 'center' }}>
+                  {show && <Text style={{ fontSize: 9, color: MUTED, fontWeight: '600' }} numberOfLines={1}>{lbl}</Text>}
+                </View>
               );
             })}
           </View>
@@ -376,9 +376,9 @@ const wm = StyleSheet.create({
   input:         { flex: 1, backgroundColor: CARD, color: TEXT, fontSize: 28, fontWeight: '900', borderRadius: 10, paddingHorizontal: 16, paddingVertical: 14, textAlign: 'center', borderWidth: 1, borderColor: BORDER, fontFamily: SERIF },
   unitLabel:     { fontSize: 18, fontWeight: '700', color: MUTED, width: 32 },
   saveBtn:       { backgroundColor: ACCENT, borderRadius: 10, paddingVertical: 14, alignItems: 'center' },
-  saveBtnOff:    { backgroundColor: CARD },
+  saveBtnOff:    { backgroundColor: 'transparent', borderWidth: 1.5, borderColor: BORDER },
   saveTxt:       { color: BG, fontWeight: '800', fontSize: 15 },
-  saveTxtOff:    { color: MUTED },
+  saveTxtOff:    { color: DIM },
 });
 
 // ── Weight section ────────────────────────────────────────────────────────────
