@@ -17,8 +17,16 @@ export function useCalorieStore() {
   const userRef   = useRef(user);
   userRef.current = user;
 
-  const [history, setHistory, historyLoaded] = useAsyncStorage<CalorieHistory>(HISTORY_KEY, defaultHistory);
-  const [goals,   setGoals,   goalsLoaded]   = useAsyncStorage<CalorieGoals>(GOALS_KEY, defaultGoals);
+  const [history,  setHistory,  historyLoaded] = useAsyncStorage<CalorieHistory>(HISTORY_KEY, defaultHistory);
+  const [rawGoals, setGoals,   goalsLoaded]   = useAsyncStorage<any>(GOALS_KEY, defaultGoals);
+
+  // Normalise legacy { dailyTarget } format that existed before the macro rebuild.
+  // Spreads defaultGoals first so every field always has a value.
+  const goals: CalorieGoals = {
+    ...defaultGoals,
+    ...rawGoals,
+    calories: rawGoals?.calories ?? (rawGoals as any)?.dailyTarget ?? defaultGoals.calories,
+  };
 
   // Pull from Supabase on sign-in
   useEffect(() => {
@@ -29,7 +37,7 @@ export function useCalorieStore() {
     ]).then(([hRes, sRes]) => {
       if (hRes.data?.data) setHistory(hRes.data.data as CalorieHistory);
       if (sRes.data?.daily_target !== undefined)
-        setGoals((prev) => ({ ...defaultGoals, ...prev, calories: sRes.data!.daily_target }));
+        setGoals((prev: any) => ({ ...defaultGoals, ...prev, calories: sRes.data!.daily_target }));
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);

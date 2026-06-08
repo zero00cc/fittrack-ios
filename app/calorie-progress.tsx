@@ -29,77 +29,64 @@ function fmtTick(v: number): string {
 
 // ── 30-day bar chart ──────────────────────────────────────────────────────────
 
-const CHART_H  = 160;   // px — bar area height
-const LABEL_H  = 22;    // px — x-axis label row
-const BAR_W    = 18;    // px — bar width
-const BAR_SLOT = 26;    // px — slot width (bar + gap)
-const Y_W      = 42;    // px — y-axis panel width
+const CHART_H  = 150;
+const BAR_W    = 18;
+const BAR_SLOT = 26;
+const Y_W      = 44;
 
 function BarChart({ history, goals }: { history: any; goals: any }) {
-  const days   = getLast30Days();
-  const values = days.map((d) => dayTotals(history[d]).calories);
-  const maxVal = Math.max(goals.calories * 1.3, ...values, 100);
+  const days      = getLast30Days();
+  const values    = days.map((d) => dayTotals(history[d]).calories);
+  // Guard against NaN — goals.calories may be undefined if legacy settings exist
+  const goalKcal  = goals.calories > 0 ? goals.calories : 2000;
+  const maxVal    = Math.max(goalKcal * 1.3, ...values, 100);
 
   const step   = niceStep(maxVal, 4);
   const yTicks = Array.from({ length: Math.floor(maxVal / step) + 1 }, (_, i) => i * step);
-  const chartW = days.length * BAR_SLOT;
 
   return (
     <View style={bc.wrap}>
       <Text style={bc.title}>Last 30 Days</Text>
 
       <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
-        {/* ── Y-axis panel (fixed, outside scroll) ── */}
+
+        {/* Y-axis — NOT inside the ScrollView, so position:absolute is safe here */}
         <View style={{ width: Y_W, height: CHART_H, position: 'relative' }}>
           {yTicks.map((v) => (
-            <Text key={v} style={[bc.yLabel, { bottom: Math.round((v / maxVal) * CHART_H) - 7 }]}>
+            <Text key={v} style={[bc.yLabel, { bottom: Math.max(0, Math.round((v / maxVal) * CHART_H) - 7) }]}>
               {fmtTick(v)}
             </Text>
           ))}
+          {/* Goal tick highlight */}
+          <View style={[bc.goalTick, { bottom: Math.round((goalKcal / maxVal) * CHART_H) }]} />
         </View>
 
-        {/* ── Scrollable bars + labels ── */}
+        {/* Scrollable chart — ZERO absolute positioning inside */}
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1 }}>
-          <View style={{ width: chartW }}>
-
-            {/* Bar area — fixed height, relative so gridlines (absolute) anchor here */}
-            <View style={{ height: CHART_H, position: 'relative' }}>
-              {/* Gridlines — absolute 1-px lines, don't affect bar layout */}
-              {yTicks.map((v) => (
-                <View key={v} style={[bc.gridLine, { bottom: Math.round((v / maxVal) * CHART_H), width: chartW }]} />
-              ))}
-              {/* Goal line */}
-              <View style={[bc.targetLine, {
-                bottom: Math.min(CHART_H - 1, Math.round((goals.calories / maxVal) * CHART_H)),
-                width:  chartW,
-              }]} />
-
-              {/* Bars — normal flex flow, NOT absolutely positioned.
-                  Each slot is CHART_H tall and grows its bar from the bottom
-                  via justifyContent: 'flex-end'. This is cross-platform safe. */}
-              <View style={{ flexDirection: 'row', height: CHART_H }}>
-                {days.map((date, i) => {
-                  const val     = values[i];
-                  const h       = val > 0 ? Math.max(4, Math.round((val / maxVal) * CHART_H)) : 3;
-                  const color   = calorieColor(val, goals.calories);
-                  const isToday = i === days.length - 1;
-                  return (
-                    <View key={date} style={{ width: BAR_SLOT, height: CHART_H, justifyContent: 'flex-end', alignItems: 'center' }}>
-                      <View style={[bc.bar, {
-                        width:           BAR_W,
-                        height:          h,
-                        backgroundColor: val > 0 ? color : '#2d3748',
-                        borderWidth:     isToday ? 1.5 : 0,
-                        borderColor:     '#f1f5f9',
-                      }]} />
-                    </View>
-                  );
-                })}
-              </View>
+          <View>
+            {/* Bar row: pure flex, alignItems:flex-end makes bars grow from the bottom */}
+            <View style={{ flexDirection: 'row', alignItems: 'flex-end', height: CHART_H }}>
+              {days.map((date, i) => {
+                const val     = values[i];
+                const h       = val > 0 ? Math.max(4, Math.round((val / maxVal) * CHART_H)) : 2;
+                const isToday = i === days.length - 1;
+                return (
+                  <View key={date} style={{ width: BAR_SLOT, alignItems: 'center' }}>
+                    <View style={{
+                      width:           BAR_W,
+                      height:          h,
+                      backgroundColor: val > 0 ? calorieColor(val, goalKcal) : '#334155',
+                      borderRadius:    4,
+                      borderWidth:     isToday ? 1.5 : 0,
+                      borderColor:     '#f1f5f9',
+                    }} />
+                  </View>
+                );
+              })}
             </View>
 
-            {/* X-axis label row — separate normal-flow row below bars */}
-            <View style={{ flexDirection: 'row', height: LABEL_H, alignItems: 'center' }}>
+            {/* X-label row */}
+            <View style={{ flexDirection: 'row', paddingTop: 6 }}>
               {days.map((date, i) => {
                 const show = i === 0 || i % 5 === 0 || i === days.length - 1;
                 return (
@@ -119,34 +106,27 @@ function BarChart({ history, goals }: { history: any; goals: any }) {
 
       {/* Legend */}
       <View style={bc.legend}>
-        {([['#3b82f6', 'Under'], ['#22c55e', 'On track'], ['#ef4444', 'Over']] as const).map(([c, l]) => (
+        {([['#3b82f6', 'Under goal'], ['#22c55e', 'On track'], ['#ef4444', 'Over goal']] as const).map(([c, l]) => (
           <View key={l} style={bc.legendItem}>
             <View style={[bc.dot, { backgroundColor: c }]} />
             <Text style={bc.legendTxt}>{l}</Text>
           </View>
         ))}
-        <View style={bc.legendItem}>
-          <View style={bc.targetSwatch} />
-          <Text style={bc.legendTxt}>Goal</Text>
-        </View>
       </View>
     </View>
   );
 }
 
 const bc = StyleSheet.create({
-  wrap:        { backgroundColor: '#1e293b', borderRadius: 20, padding: 16, gap: 12 },
-  title:       { fontSize: 14, fontWeight: '700', color: '#f1f5f9' },
-  yLabel:      { position: 'absolute', right: 4, fontSize: 9, color: '#475569', fontWeight: '600' },
-  gridLine:    { position: 'absolute', left: 0, height: 1, backgroundColor: '#334155', opacity: 0.4 },
-  targetLine:  { position: 'absolute', left: 0, height: 1, borderTopWidth: 1, borderTopColor: '#10b981', borderStyle: 'dashed', opacity: 0.8 },
-  bar:         { borderRadius: 4 },
-  xLabel:      { fontSize: 9, color: '#64748b', textAlign: 'center' },
-  legend:      { flexDirection: 'row', justifyContent: 'center', gap: 14, flexWrap: 'wrap' },
-  legendItem:  { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  dot:         { width: 8, height: 8, borderRadius: 4 },
-  targetSwatch:{ width: 14, height: 2, backgroundColor: '#10b981', borderRadius: 1 },
-  legendTxt:   { fontSize: 10, color: '#64748b' },
+  wrap:      { backgroundColor: '#1e293b', borderRadius: 20, padding: 16, gap: 12 },
+  title:     { fontSize: 14, fontWeight: '700', color: '#f1f5f9' },
+  yLabel:    { position: 'absolute', right: 6, fontSize: 9, color: '#475569', fontWeight: '600' },
+  goalTick:  { position: 'absolute', right: 0, width: 6, height: 1, backgroundColor: '#10b981' },
+  xLabel:    { fontSize: 9, color: '#64748b', textAlign: 'center' },
+  legend:    { flexDirection: 'row', justifyContent: 'center', gap: 16, flexWrap: 'wrap' },
+  legendItem:{ flexDirection: 'row', alignItems: 'center', gap: 4 },
+  dot:       { width: 8, height: 8, borderRadius: 4 },
+  legendTxt: { fontSize: 10, color: '#64748b' },
 });
 
 // ── Calendar ──────────────────────────────────────────────────────────────────
