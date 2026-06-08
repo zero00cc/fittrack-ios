@@ -297,7 +297,7 @@ const rp = StyleSheet.create({
   option:      { backgroundColor: CARD, borderRadius: 13, padding: 16, gap: 4, borderWidth: 1, borderColor: BORDER },
   optionTitle: { fontSize: 15, fontWeight: '700', color: TEXT },
   optionDesc:  { fontSize: 12, color: MUTED },
-  cancel:      { alignItems: 'center', paddingVertical: 6 },
+  cancel:      { alignItems: 'center', paddingVertical: 14, marginTop: 4, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: BORDER },
   cancelTxt:   { fontSize: 14, color: DIM, fontWeight: '600' },
 });
 
@@ -590,12 +590,12 @@ const s = StyleSheet.create({
   loadTxt:      { color: MUTED, fontSize: 15 },
   scroll:       { padding: 16, gap: 14, paddingBottom: 40 },
 
-  header:       { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
+  header:       { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   appName:      { fontSize: 26, fontWeight: '700', color: TEXT, fontFamily: SERIF },
   dateLabel:    { fontSize: 13, color: MUTED, marginTop: 2 },
   headerRight:  { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  aiReportBtn:  { backgroundColor: ACCENT_SOFT, borderRadius: 9, paddingHorizontal: 12, paddingVertical: 10, borderWidth: 1, borderColor: ACCENT },
-  aiReportTxt:  { fontSize: 12, fontWeight: '800', color: TEXT, letterSpacing: 0.3 },
+  aiReportBtn:  { backgroundColor: CARD, borderRadius: 9, paddingHorizontal: 12, paddingVertical: 10, borderWidth: 1, borderColor: BORDER },
+  aiReportTxt:  { fontSize: 12, fontWeight: '700', color: ACCENT },
   settingsBtn:  { backgroundColor: CARD, borderRadius: 9, padding: 10, borderWidth: 1, borderColor: BORDER },
   settingsIcon: { fontSize: 18, color: MUTED },
 
