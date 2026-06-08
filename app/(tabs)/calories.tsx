@@ -21,10 +21,9 @@ import {
 
 const MAX_DAYS_BACK = 7;
 const WEIGHT_KEY    = 'fittrack_weight_log';
-// Three distinguishable shades — all visible on white CARD (light theme)
-const C_PROTEIN = DIM;          // P600 #AD8D1A — lightest of three (3:1 on white)
-const C_CARBS   = ACCENT;       // P700 #886918 — medium (5.3:1 on white)
-const C_FAT     = ACCENT_DARK;  // P900 #60481C — darkest (8.9:1 on white)
+const C_PROTEIN = DIM;
+const C_CARBS   = ACCENT;
+const C_FAT     = ACCENT_DARK;
 
 export const pendingImage = { uri: '', mimeType: 'image/jpeg', date: '' };
 
@@ -59,9 +58,6 @@ const ws = StyleSheet.create({
   num:   { fontSize: 15, fontWeight: '900', color: TEXT, marginTop: 2, fontFamily: SERIF },
   numOn: { color: BG },
 });
-
-// ── Macro chip ────────────────────────────────────────────────────────────────
-
 
 // ── Add manually modal ────────────────────────────────────────────────────────
 
@@ -138,6 +134,83 @@ const am = StyleSheet.create({
   addBtn:     { backgroundColor: TEXT, borderRadius: 10, paddingVertical: 15, alignItems: 'center' },
   addBtnOff:  { backgroundColor: CARD },
   addTxt:     { color: BG, fontWeight: '800', fontSize: 15 },
+});
+
+// ── Log weight modal ──────────────────────────────────────────────────────────
+
+function LogWeightModal({ date, weightLog, unit, onSave, onClose }: {
+  date:      string;
+  weightLog: Record<string, number>;
+  unit:      'kg' | 'lbs';
+  onSave:    (kg: number) => void;
+  onClose:   () => void;
+}) {
+  const toDisplay = (kg: number) => unit === 'lbs' ? (kg * 2.2046).toFixed(1) : kg.toFixed(1);
+  const [input, setInput] = useState(() => {
+    const kg = weightLog[date];
+    return kg ? toDisplay(kg) : '';
+  });
+
+  const dateLabel = date === todayYMD()
+    ? 'Today'
+    : new Date(date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
+
+  function save() {
+    const val = parseFloat(input);
+    if (!val || val <= 0) return;
+    const kg = unit === 'kg' ? val : val / 2.2046;
+    onSave(Math.round(kg * 100) / 100);
+    onClose();
+  }
+
+  return (
+    <Modal visible animationType="slide" transparent>
+      <View style={lw.overlay}>
+        <View style={lw.sheet}>
+          <View style={lw.header}>
+            <Text style={lw.title}>Log Weight</Text>
+            <TouchableOpacity onPress={onClose}><Text style={lw.close}>×</Text></TouchableOpacity>
+          </View>
+          <Text style={lw.dateLabel}>{dateLabel}</Text>
+          <View style={lw.inputRow}>
+            <TextInput
+              style={lw.input}
+              value={input}
+              onChangeText={setInput}
+              keyboardType="decimal-pad"
+              placeholder={unit === 'kg' ? '70.0' : '154.3'}
+              placeholderTextColor={DIM}
+              autoFocus
+              selectTextOnFocus
+            />
+            <Text style={lw.unitLabel}>{unit}</Text>
+          </View>
+          <TouchableOpacity
+            style={[lw.saveBtn, !input && lw.saveBtnOff]}
+            onPress={save}
+            disabled={!input}
+          >
+            <Text style={[lw.saveTxt, !input && lw.saveTxtOff]}>Save</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+const lw = StyleSheet.create({
+  overlay:    { flex: 1, backgroundColor: 'rgba(0,0,0,0.75)', justifyContent: 'flex-end' },
+  sheet:      { backgroundColor: CARD2, borderTopLeftRadius: 22, borderTopRightRadius: 22, padding: 20, gap: 14, paddingBottom: 36, borderTopWidth: 1, borderColor: BORDER },
+  header:     { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  title:      { fontSize: 17, fontWeight: '700', color: TEXT, fontFamily: SERIF },
+  close:      { color: MUTED, fontSize: 22, padding: 4 },
+  dateLabel:  { fontSize: 12, color: MUTED, fontWeight: '600', textAlign: 'center' },
+  inputRow:   { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  input:      { flex: 1, backgroundColor: CARD, color: TEXT, fontSize: 28, fontWeight: '900', borderRadius: 10, paddingHorizontal: 16, paddingVertical: 14, textAlign: 'center', borderWidth: 1, borderColor: BORDER, fontFamily: SERIF },
+  unitLabel:  { fontSize: 18, fontWeight: '700', color: MUTED, width: 32 },
+  saveBtn:    { backgroundColor: ACCENT, borderRadius: 10, paddingVertical: 14, alignItems: 'center' },
+  saveBtnOff: { backgroundColor: 'transparent', borderWidth: 1.5, borderColor: BORDER },
+  saveTxt:    { color: BG, fontWeight: '800', fontSize: 15 },
+  saveTxtOff: { color: DIM },
 });
 
 // ── Edit entry modal ──────────────────────────────────────────────────────────
@@ -383,6 +456,10 @@ export default function CaloriesScreen() {
   const [selectedDate, setSelectedDate] = useState(todayYMD);
   const [editEntry,    setEditEntry]    = useState<MacroEntry | null>(null);
   const [addManual,    setAddManual]    = useState(false);
+  const [fabOpen,      setFabOpen]      = useState(false);
+  const [logWeight,    setLogWeight]    = useState(false);
+  const [weightLog,    setWeightLog]    = useState<Record<string, number>>({});
+  const [weightUnit,   setWeightUnit]   = useState<'kg' | 'lbs'>('kg');
 
   const [toast, setToast] = useState<string | null>(null);
   const toastAnim         = useRef(new Animated.Value(0)).current;
@@ -400,6 +477,12 @@ export default function CaloriesScreen() {
       if (!(raw && JSON.parse(raw).onboardingComplete)) router.replace('/calorie-onboarding');
     });
   }, [reloadHistory, reloadGoals]));
+
+  useEffect(() => {
+    AsyncStorage.getItem(WEIGHT_KEY).then((raw) => {
+      if (raw) setWeightLog(JSON.parse(raw));
+    });
+  }, []);
 
   const selectedLog = history[selectedDate] ?? { date: selectedDate, entries: [] };
 
@@ -422,6 +505,13 @@ export default function CaloriesScreen() {
       Animated.delay(1800),
       Animated.timing(toastAnim, { toValue: 0, duration: 300, useNativeDriver: true }),
     ]).start(() => setToast(null));
+  }
+
+  function saveWeight(kg: number) {
+    const updated = { ...weightLog, [selectedDate]: kg };
+    setWeightLog(updated);
+    AsyncStorage.setItem(WEIGHT_KEY, JSON.stringify(updated));
+    showToast(`Weight logged for ${selectedDate === todayYMD() ? 'today' : selectedDate}`);
   }
 
   async function openCamera() {
@@ -457,9 +547,9 @@ export default function CaloriesScreen() {
         AsyncStorage.getItem(WEIGHT_KEY),
       ]);
       const profile   = profileRaw ? JSON.parse(profileRaw) as UserProfile : null;
-      const weightLog = weightRaw  ? JSON.parse(weightRaw) as Record<string, number> : {};
+      const weightLogData = weightRaw  ? JSON.parse(weightRaw) as Record<string, number> : {};
       if (!profile) throw new Error('Bio data not found. Please complete onboarding first.');
-      const text = await generateReport(type, profile, goals, history, weightLog);
+      const text = await generateReport(type, profile, goals, history, weightLogData);
       setReportText(text);
     } catch (err: any) {
       setReportText(`Could not generate report: ${err.message}`);
@@ -474,6 +564,13 @@ export default function CaloriesScreen() {
   const mainColor = calorieColor(totals.calories, goals.calories);
   const isToday   = selectedDate === todayYMD();
   const remaining = goals.calories - totals.calories;
+
+  const FAB_OPTIONS = [
+    { icon: '📷', label: 'Scan Food',     sub: 'Take a photo to analyse',    onPress: () => { setFabOpen(false); openCamera();         } },
+    { icon: '🖼️', label: 'Upload Photo',  sub: 'Choose from your library',   onPress: () => { setFabOpen(false); openLibrary();        } },
+    { icon: '✏️', label: 'Add Manually',  sub: 'Enter nutrition details',     onPress: () => { setFabOpen(false); setAddManual(true);   } },
+    { icon: '⚖️', label: 'Log Weight',    sub: 'Record your weight for today', onPress: () => { setFabOpen(false); setLogWeight(true);  } },
+  ];
 
   return (
     <SafeAreaView style={s.safe} edges={['top', 'bottom']}>
@@ -527,21 +624,6 @@ export default function CaloriesScreen() {
           <DonutRing current={totals.fat}      goal={goals.fat}     color={C_FAT}     size={112} label="Fat"     />
         </View>
 
-        {/* ── Actions ── */}
-        <View style={s.actionRow}>
-          <TouchableOpacity style={s.scanBtn} onPress={openCamera}>
-            <Text style={s.scanTxt}>Scan Food</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={s.libBtn} onPress={openLibrary}>
-            <Text style={s.libTxt}>Upload Photo</Text>
-          </TouchableOpacity>
-        </View>
-
-        <TouchableOpacity style={s.addBtn} onPress={() => setAddManual(true)}>
-          <Text style={s.addIcon}>+</Text>
-          <Text style={s.addTxt}>Add Manually</Text>
-        </TouchableOpacity>
-
         {/* ── Log ── */}
         <View style={s.logCard}>
           <View style={s.logHeader}>
@@ -555,7 +637,7 @@ export default function CaloriesScreen() {
             <View style={s.empty}>
               <Text style={[s.emptyNum, { fontFamily: SERIF }]}>—</Text>
               <Text style={s.emptyTxt}>No meals logged{isToday ? ' yet' : ' for this day'}</Text>
-              <Text style={s.emptySub}>{isToday ? 'Scan food or add manually to begin' : 'Use the buttons above to add a meal'}</Text>
+              <Text style={s.emptySub}>Tap  +  to log a meal or weight</Text>
             </View>
           ) : (
             [...selectedLog.entries].reverse().map((entry) => (
@@ -566,6 +648,12 @@ export default function CaloriesScreen() {
 
       </ScrollView>
 
+      {/* ── FAB ── */}
+      <TouchableOpacity style={s.fab} onPress={() => setFabOpen(true)} activeOpacity={0.85}>
+        <Text style={s.fabIcon}>+</Text>
+      </TouchableOpacity>
+
+      {/* ── Toast ── */}
       {toast && (
         <Animated.View style={[s.toast, {
           opacity:   toastAnim,
@@ -576,10 +664,33 @@ export default function CaloriesScreen() {
         </Animated.View>
       )}
 
-      {addManual && <AddManualModal date={selectedDate} onAdd={addEntry} onClose={() => setAddManual(false)} />}
-      {editEntry && <EditEntryModal entry={editEntry} onSave={updateEntry} onDelete={removeHistoryEntry} onClose={() => setEditEntry(null)} />}
+      {/* ── FAB menu ── */}
+      {fabOpen && (
+        <Modal visible animationType="slide" transparent>
+          <TouchableOpacity style={fm.overlay} activeOpacity={1} onPress={() => setFabOpen(false)}>
+            <TouchableOpacity activeOpacity={1} style={fm.sheet} onPress={() => {}}>
+              <View style={fm.handle} />
+              <Text style={fm.sheetTitle}>Add to Log</Text>
+              {FAB_OPTIONS.map((opt) => (
+                <TouchableOpacity key={opt.label} style={fm.option} onPress={opt.onPress} activeOpacity={0.75}>
+                  <View style={fm.iconBadge}><Text style={fm.optionIcon}>{opt.icon}</Text></View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={fm.optionLabel}>{opt.label}</Text>
+                    <Text style={fm.optionSub}>{opt.sub}</Text>
+                  </View>
+                  <Text style={fm.arrow}>›</Text>
+                </TouchableOpacity>
+              ))}
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </Modal>
+      )}
+
+      {addManual    && <AddManualModal   date={selectedDate} onAdd={addEntry} onClose={() => setAddManual(false)} />}
+      {logWeight    && <LogWeightModal   date={selectedDate} weightLog={weightLog} unit={weightUnit} onSave={saveWeight} onClose={() => setLogWeight(false)} />}
+      {editEntry    && <EditEntryModal   entry={editEntry} onSave={updateEntry} onDelete={removeHistoryEntry} onClose={() => setEditEntry(null)} />}
       {showReportPicker && <ReportPickerModal onSelect={handleGenerateReport} onClose={() => setShowReportPicker(false)} />}
-      {showReport && <ReportViewModal text={reportText} loading={reportLoading} onClose={() => setShowReport(false)} />}
+      {showReport       && <ReportViewModal   text={reportText} loading={reportLoading} onClose={() => setShowReport(false)} />}
     </SafeAreaView>
   );
 }
@@ -588,7 +699,7 @@ const s = StyleSheet.create({
   safe:         { flex: 1, backgroundColor: BG },
   center:       { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: BG },
   loadTxt:      { color: MUTED, fontSize: 15 },
-  scroll:       { padding: 16, gap: 14, paddingBottom: 40 },
+  scroll:       { padding: 16, gap: 14, paddingBottom: 100 },
 
   header:       { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   appName:      { fontSize: 26, fontWeight: '700', color: TEXT, fontFamily: SERIF },
@@ -610,16 +721,6 @@ const s = StyleSheet.create({
 
   macroRow:     { flexDirection: 'row', justifyContent: 'space-between' },
 
-  actionRow:    { flexDirection: 'row', gap: 10 },
-  scanBtn:      { flex: 1, backgroundColor: ACCENT, borderRadius: 12, paddingVertical: 17, alignItems: 'center', justifyContent: 'center' },
-  scanTxt:      { fontSize: 15, fontWeight: '800', color: BG, letterSpacing: 0.2 },
-  libBtn:       { flex: 1, backgroundColor: CARD, borderRadius: 12, paddingVertical: 17, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: BORDER },
-  libTxt:       { fontSize: 15, fontWeight: '700', color: MUTED },
-
-  addBtn:       { backgroundColor: BG, borderRadius: 12, paddingVertical: 13, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderWidth: 1, borderColor: BORDER },
-  addIcon:      { fontSize: 18, color: ACCENT, fontWeight: '700' },
-  addTxt:       { fontSize: 14, fontWeight: '600', color: MUTED },
-
   logCard:      { backgroundColor: CARD, borderRadius: 16, padding: 16, borderWidth: 1, borderColor: BORDER },
   logHeader:    { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
   logTitle:     { fontSize: 15, fontWeight: '700', color: TEXT, fontFamily: SERIF },
@@ -630,7 +731,23 @@ const s = StyleSheet.create({
   emptyTxt:     { fontSize: 14, color: MUTED, fontWeight: '600' },
   emptySub:     { fontSize: 11, color: DIM, textAlign: 'center' },
 
-  toast:        { position: 'absolute', bottom: 24, left: 16, right: 16, backgroundColor: TEXT, borderRadius: 12, padding: 14, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  fab:          { position: 'absolute', bottom: 24, right: 16, width: 56, height: 56, borderRadius: 28, backgroundColor: ACCENT, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 8, shadowOffset: { width: 0, height: 4 }, elevation: 8 },
+  fabIcon:      { fontSize: 30, color: BG, fontWeight: '300', lineHeight: 34, marginTop: -2 },
+
+  toast:        { position: 'absolute', bottom: 92, left: 16, right: 16, backgroundColor: TEXT, borderRadius: 12, padding: 14, flexDirection: 'row', alignItems: 'center', gap: 10 },
   toastIcon:    { fontSize: 16, color: ACCENT_SOFT },
   toastTxt:     { fontSize: 14, fontWeight: '700', color: CARD, flex: 1 },
+});
+
+const fm = StyleSheet.create({
+  overlay:     { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
+  sheet:       { backgroundColor: CARD2, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, gap: 10, paddingBottom: 40, borderTopWidth: 1, borderColor: BORDER },
+  handle:      { width: 36, height: 4, borderRadius: 2, backgroundColor: BORDER, alignSelf: 'center', marginBottom: 6 },
+  sheetTitle:  { fontSize: 13, fontWeight: '700', color: MUTED, textTransform: 'uppercase', letterSpacing: 0.8, textAlign: 'center', marginBottom: 4 },
+  option:      { flexDirection: 'row', alignItems: 'center', backgroundColor: CARD, borderRadius: 14, padding: 16, gap: 14, borderWidth: 1, borderColor: BORDER },
+  iconBadge:   { width: 44, height: 44, borderRadius: 22, backgroundColor: CARD2, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: BORDER },
+  optionIcon:  { fontSize: 20 },
+  optionLabel: { fontSize: 15, fontWeight: '700', color: TEXT },
+  optionSub:   { fontSize: 11, color: MUTED, marginTop: 2 },
+  arrow:       { fontSize: 22, color: MUTED },
 });
