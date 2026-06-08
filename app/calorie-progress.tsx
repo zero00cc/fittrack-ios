@@ -208,14 +208,22 @@ function CalendarView({ history, goals, onDayPress }: {
       <View style={cal.grid}>
         {cells.map((date, i) => {
           if (!date) return <View key={`e${i}`} style={cal.cell} />;
-          const log     = history[date];
-          const hasData = log && log.entries.length > 0;
-          const color   = hasData ? calorieColor(dayTotals(log).calories, goals.calories) : null;
-          const isToday = date === todayStr;
+          const log      = history[date];
+          const hasData  = log && log.entries.length > 0;
+          const color    = hasData ? calorieColor(dayTotals(log).calories, goals.calories) : null;
+          const isToday  = date === todayStr;
+          const isFuture = date > todayStr;
           return (
-            <TouchableOpacity key={date} style={[cal.cell, isToday && cal.cellToday]} onPress={() => onDayPress(date)}>
-              <Text style={[cal.cellTxt, isToday && cal.cellTxtToday]}>{parseInt(date.slice(8))}</Text>
-              {color && <View style={[cal.cellDot, { backgroundColor: color }]} />}
+            <TouchableOpacity
+              key={date}
+              style={[cal.cell, isToday && cal.cellToday, isFuture && cal.cellFuture]}
+              onPress={() => onDayPress(date)}
+              disabled={isFuture}
+            >
+              <Text style={[cal.cellTxt, isToday && cal.cellTxtToday, isFuture && cal.cellTxtFuture]}>
+                {parseInt(date.slice(8))}
+              </Text>
+              {color && !isFuture && <View style={[cal.cellDot, { backgroundColor: color }]} />}
             </TouchableOpacity>
           );
         })}
@@ -237,6 +245,8 @@ const cal = StyleSheet.create({
   cellToday:    { backgroundColor: '#0f172a', borderRadius: 8 },
   cellTxt:      { fontSize: 13, color: '#64748b' },
   cellTxtToday: { color: '#f1f5f9', fontWeight: '700' },
+  cellFuture:   { opacity: 0.2 },
+  cellTxtFuture:{ color: '#334155' },
   cellDot:      { width: 5, height: 5, borderRadius: 3 },
 });
 
@@ -368,7 +378,8 @@ function DayModal({ date, history, goals, addEntry, updateEntry, removeHistoryEn
   const totals  = dayTotals(log);
   const color   = calorieColor(totals.calories, goals.calories);
   const label   = new Date(date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
-  const canAdd  = daysBetween(date, todayYMD()) <= MAX_DAYS_BACK;  // within 7 days
+  const daysBack = daysBetween(date, todayYMD());  // positive = past, negative = future
+  const canAdd   = daysBack >= 0 && daysBack <= MAX_DAYS_BACK;
 
   function startEdit(entry: MacroEntry) { setEditing(entry); setView('edit'); }
   function closeSubView()               { setEditing(null); setView('list'); }
