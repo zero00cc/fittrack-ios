@@ -6,7 +6,6 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useCalorieStore } from '../../hooks/useCalorieStore';
 import { MacroEntry } from '../../types/calorie.types';
 import { dayTotals, calorieColor, generateId } from '../../utils/calorieUtils';
@@ -20,7 +19,6 @@ import {
 } from '../../constants/theme';
 
 const MAX_DAYS_BACK = 7;
-const WEIGHT_KEY    = 'fittrack_weight_log';
 const C_PROTEIN = DIM;
 const C_CARBS   = ACCENT;
 const C_FAT     = ACCENT_DARK;
@@ -448,9 +446,9 @@ const rv = StyleSheet.create({
 
 export default function CaloriesScreen() {
   const {
-    history, goals, loaded,
+    history, goals, loaded, weightLog,
     addEntry, removeHistoryEntry, updateEntry,
-    reloadHistory, reloadGoals,
+    saveWeight, reloadHistory, reloadGoals,
   } = useCalorieStore();
 
   const [selectedDate, setSelectedDate] = useState(todayYMD);
@@ -458,7 +456,6 @@ export default function CaloriesScreen() {
   const [addManual,    setAddManual]    = useState(false);
   const [fabOpen,      setFabOpen]      = useState(false);
   const [logWeight,    setLogWeight]    = useState(false);
-  const [weightLog,    setWeightLog]    = useState<Record<string, number>>({});
   const [weightUnit,   setWeightUnit]   = useState<'kg' | 'lbs'>('kg');
 
   const [toast, setToast] = useState<string | null>(null);
@@ -477,12 +474,6 @@ export default function CaloriesScreen() {
       if (!(raw && JSON.parse(raw).onboardingComplete)) router.replace('/calorie-onboarding');
     });
   }, [reloadHistory, reloadGoals]));
-
-  useEffect(() => {
-    AsyncStorage.getItem(WEIGHT_KEY).then((raw) => {
-      if (raw) setWeightLog(JSON.parse(raw));
-    });
-  }, []);
 
   const selectedLog = history[selectedDate] ?? { date: selectedDate, entries: [] };
 
@@ -505,13 +496,6 @@ export default function CaloriesScreen() {
       Animated.delay(1800),
       Animated.timing(toastAnim, { toValue: 0, duration: 300, useNativeDriver: true }),
     ]).start(() => setToast(null));
-  }
-
-  function saveWeight(kg: number) {
-    const updated = { ...weightLog, [selectedDate]: kg };
-    setWeightLog(updated);
-    AsyncStorage.setItem(WEIGHT_KEY, JSON.stringify(updated));
-    showToast(`Weight logged for ${selectedDate === todayYMD() ? 'today' : selectedDate}`);
   }
 
   async function openCamera() {
@@ -687,7 +671,7 @@ export default function CaloriesScreen() {
       )}
 
       {addManual    && <AddManualModal   date={selectedDate} onAdd={addEntry} onClose={() => setAddManual(false)} />}
-      {logWeight    && <LogWeightModal   date={selectedDate} weightLog={weightLog} unit={weightUnit} onSave={saveWeight} onClose={() => setLogWeight(false)} />}
+      {logWeight    && <LogWeightModal   date={selectedDate} weightLog={weightLog} unit={weightUnit} onSave={(kg) => { saveWeight(selectedDate, kg); showToast(`Weight logged for ${selectedDate === todayYMD() ? 'today' : selectedDate}`); }} onClose={() => setLogWeight(false)} />}
       {editEntry    && <EditEntryModal   entry={editEntry} onSave={updateEntry} onDelete={removeHistoryEntry} onClose={() => setEditEntry(null)} />}
       {showReportPicker && <ReportPickerModal onSelect={handleGenerateReport} onClose={() => setShowReportPicker(false)} />}
       {showReport       && <ReportViewModal   text={reportText} loading={reportLoading} onClose={() => setShowReport(false)} />}

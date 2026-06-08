@@ -4,7 +4,6 @@ import {
   StyleSheet, TextInput,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useCalorieStore } from '../hooks/useCalorieStore';
 import { dayTotals, calorieColor, generateId } from '../utils/calorieUtils';
 import { getLast30Days, formatShortDate, toYMD, todayYMD, daysBetween } from '../utils/dateUtils';
@@ -15,9 +14,6 @@ import {
 } from '../constants/theme';
 
 const MAX_DAYS_BACK = 7;
-const WEIGHT_KEY    = 'fittrack_weight_log';
-
-type WeightLog = Record<string, number>; // { YYYY-MM-DD: kg }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -166,7 +162,7 @@ function LineSeg({ x1, y1, x2, y2 }: { x1: number; y1: number; x2: number; y2: n
 }
 
 function WeightLineChart({ log, unit, onDayPress }: {
-  log: WeightLog; unit: 'kg' | 'lbs'; onDayPress: (date: string) => void;
+  log: Record<string, number>; unit: 'kg' | 'lbs'; onDayPress: (date: string) => void;
 }) {
   const scrollRef = useRef<ScrollView>(null);
   useEffect(() => { scrollRef.current?.scrollToEnd({ animated: false }); }, []);
@@ -266,7 +262,7 @@ function WeightLineChart({ log, unit, onDayPress }: {
 // ── Weight modal ──────────────────────────────────────────────────────────────
 
 function WeightModal({ initialDate, weightLog, unit, onSave, onClose }: {
-  initialDate: string; weightLog: WeightLog; unit: 'kg' | 'lbs';
+  initialDate: string; weightLog: Record<string, number>; unit: 'kg' | 'lbs';
   onSave: (date: string, kg: number) => void;
   onClose: () => void;
 }) {
@@ -731,25 +727,12 @@ const dm = StyleSheet.create({
 // ── Main screen ───────────────────────────────────────────────────────────────
 
 export default function CalorieProgressScreen() {
-  const { history, goals, loaded, addEntry, updateEntry, removeHistoryEntry } = useCalorieStore();
+  const { history, goals, loaded, weightLog, addEntry, updateEntry, removeHistoryEntry, saveWeight } = useCalorieStore();
 
   const [choiceDate,  setChoiceDate]  = useState<string | null>(null);
   const [calorieDate, setCalorieDate] = useState<string | null>(null);
-  const [weightLog,   setWeightLog]   = useState<WeightLog>({});
   const [weightUnit,  setWeightUnit]  = useState<'kg' | 'lbs'>('kg');
-  const [weightModal, setWeightModal] = useState<string | null>(null); // date string or null
-
-  useEffect(() => {
-    AsyncStorage.getItem(WEIGHT_KEY).then((raw) => {
-      if (raw) setWeightLog(JSON.parse(raw));
-    });
-  }, []);
-
-  function saveWeight(date: string, kg: number) {
-    const updated = { ...weightLog, [date]: kg };
-    setWeightLog(updated);
-    AsyncStorage.setItem(WEIGHT_KEY, JSON.stringify(updated));
-  }
+  const [weightModal, setWeightModal] = useState<string | null>(null);
 
   if (!loaded) return <View style={s.loading}><Text style={s.loadingTxt}>Loading…</Text></View>;
 
