@@ -86,7 +86,7 @@ function CalorieLineChart({ history, goals }: { history: any; goals: any }) {
           <View style={{ height: X_AXIS_H }} />
         </View>
         <ScrollView ref={scrollRef} horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1 }}>
-          <View style={{ width: days.length * W_SLOT }}>
+          <View style={{ width: days.length * W_SLOT, height: CHART_H + X_AXIS_H }}>
             <View style={{ height: CHART_H, position: 'relative' }}>
               <View style={{
                 position: 'absolute', left: 0, width: days.length * W_SLOT,
@@ -115,12 +115,12 @@ function CalorieLineChart({ history, goals }: { history: any; goals: any }) {
             </View>
             <View style={{ height: X_AXIS_H, flexDirection: 'row', borderTopWidth: 1, borderTopColor: BORDER }}>
               {days.map((d, i) => {
-                const show = i % 5 === 0;
-                const dt   = new Date(d + 'T00:00:00');
-                const lbl  = show ? `${dt.toLocaleDateString('en-US', { month: 'short' })} ${dt.getDate()}` : '';
+                if (i % 5 !== 0) return null;
+                const dt  = new Date(d + 'T00:00:00');
+                const lbl = `${dt.toLocaleDateString('en-US', { month: 'short' })} ${dt.getDate()}`;
                 return (
-                  <View key={d} style={{ width: W_SLOT, alignItems: 'flex-start', justifyContent: 'center' }}>
-                    {show && <Text style={{ fontSize: 9, color: MUTED, fontWeight: '600' }} numberOfLines={1}>{lbl}</Text>}
+                  <View key={d} style={{ width: W_SLOT * 5, justifyContent: 'center' }}>
+                    <Text style={{ fontSize: 9, color: MUTED, fontWeight: '600' }}>{lbl}</Text>
                   </View>
                 );
               })}
@@ -214,7 +214,7 @@ function WeightLineChart({ log, unit, onDayPress }: {
         <View style={{ height: X_AXIS_H }} />
       </View>
       <ScrollView ref={scrollRef} horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1 }}>
-        <View style={{ width: days.length * W_SLOT }}>
+        <View style={{ width: days.length * W_SLOT, height: CHART_H + X_AXIS_H }}>
           <View style={{ height: CHART_H, position: 'relative' }}>
             {pts.map((pt, i) => {
               if (!pt) return null;
@@ -247,12 +247,12 @@ function WeightLineChart({ log, unit, onDayPress }: {
           </View>
           <View style={{ height: X_AXIS_H, flexDirection: 'row', borderTopWidth: 1, borderTopColor: BORDER }}>
             {days.map((d, i) => {
-              const show = i % 5 === 0;
-              const dt   = new Date(d + 'T00:00:00');
-              const lbl  = show ? `${dt.toLocaleDateString('en-US', { month: 'short' })} ${dt.getDate()}` : '';
+              if (i % 5 !== 0) return null;
+              const dt  = new Date(d + 'T00:00:00');
+              const lbl = `${dt.toLocaleDateString('en-US', { month: 'short' })} ${dt.getDate()}`;
               return (
-                <View key={d} style={{ width: W_SLOT, alignItems: 'flex-start', justifyContent: 'center' }}>
-                  {show && <Text style={{ fontSize: 9, color: MUTED, fontWeight: '600' }} numberOfLines={1}>{lbl}</Text>}
+                <View key={d} style={{ width: W_SLOT * 5, justifyContent: 'center' }}>
+                  <Text style={{ fontSize: 9, color: MUTED, fontWeight: '600' }}>{lbl}</Text>
                 </View>
               );
             })}
