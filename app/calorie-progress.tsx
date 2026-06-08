@@ -33,7 +33,7 @@ function fmtTick(v: number): string {
 
 // ── Calorie line chart ────────────────────────────────────────────────────────
 
-const CHART_H = 150; const Y_W = 44;
+const CHART_H = 150; const Y_W = 44; const X_AXIS_H = 18;
 
 // Shared chart styles (used by both calorie and weight charts)
 const bc = StyleSheet.create({
@@ -74,43 +74,57 @@ function CalorieLineChart({ history, goals }: { history: any; goals: any }) {
     <View style={bc.wrap}>
       <Text style={bc.title}>30-Day Calories</Text>
       <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
-        <View style={{ width: Y_W, height: CHART_H, position: 'relative' }}>
-          {yTicks.map((v) => (
-            <Text key={v} style={[bc.yLabel, { bottom: Math.max(0, Math.round((v / rng) * CHART_H) - 7) }]}>
-              {fmtTick(v)}
-            </Text>
-          ))}
-          <View style={[bc.goalTick, { bottom: Math.round((goalKcal / rng) * CHART_H) }]} />
+        <View style={{ width: Y_W }}>
+          <View style={{ height: CHART_H, position: 'relative' }}>
+            {yTicks.map((v) => (
+              <Text key={v} style={[bc.yLabel, { bottom: Math.max(0, Math.round((v / rng) * CHART_H) - 7) }]}>
+                {fmtTick(v)}
+              </Text>
+            ))}
+            <View style={[bc.goalTick, { bottom: Math.round((goalKcal / rng) * CHART_H) }]} />
+          </View>
+          <View style={{ height: X_AXIS_H }} />
         </View>
         <ScrollView ref={scrollRef} horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1 }}>
-          <View style={{ width: days.length * W_SLOT, height: CHART_H, position: 'relative' }}>
-            {/* Subtle goal reference line */}
-            <View style={{
-              position: 'absolute', left: 0, width: days.length * W_SLOT,
-              top: goalY, height: 1, backgroundColor: ACCENT, opacity: 0.25,
-            }} />
-            {/* Line segments */}
-            {pts.map((pt, i) => {
-              if (!pt) return null;
-              const next = pts.slice(i + 1).find((p) => p !== null);
-              if (!next) return null;
-              return <LineSeg key={`l${i}`} x1={pt.x} y1={pt.y} x2={next.x} y2={next.y} />;
-            })}
-            {/* Dots — colour-coded by status */}
-            {pts.map((pt, i) => {
-              if (!pt) return null;
-              const isToday = pt.date === todayYMD();
-              const r = isToday ? 5 : 4;
-              return (
-                <View key={`d${i}`} style={{
-                  position: 'absolute',
-                  width: r * 2, height: r * 2, borderRadius: r,
-                  backgroundColor: calorieColor(pt.v, goalKcal),
-                  top: pt.y - r, left: pt.x - r,
-                  borderWidth: isToday ? 1.5 : 0, borderColor: TEXT,
-                }} />
-              );
-            })}
+          <View style={{ width: days.length * W_SLOT }}>
+            <View style={{ height: CHART_H, position: 'relative' }}>
+              <View style={{
+                position: 'absolute', left: 0, width: days.length * W_SLOT,
+                top: goalY, height: 1, backgroundColor: ACCENT, opacity: 0.25,
+              }} />
+              {pts.map((pt, i) => {
+                if (!pt) return null;
+                const next = pts.slice(i + 1).find((p) => p !== null);
+                if (!next) return null;
+                return <LineSeg key={`l${i}`} x1={pt.x} y1={pt.y} x2={next.x} y2={next.y} />;
+              })}
+              {pts.map((pt, i) => {
+                if (!pt) return null;
+                const isToday = pt.date === todayYMD();
+                const r = isToday ? 5 : 4;
+                return (
+                  <View key={`d${i}`} style={{
+                    position: 'absolute',
+                    width: r * 2, height: r * 2, borderRadius: r,
+                    backgroundColor: calorieColor(pt.v, goalKcal),
+                    top: pt.y - r, left: pt.x - r,
+                    borderWidth: isToday ? 1.5 : 0, borderColor: TEXT,
+                  }} />
+                );
+              })}
+            </View>
+            <View style={{ height: X_AXIS_H, position: 'relative' }}>
+              {days.map((d, i) => {
+                if (i % 5 !== 0) return null;
+                const dt = new Date(d + 'T00:00:00');
+                const lbl = `${dt.toLocaleDateString('en-US', { month: 'short' })} ${dt.getDate()}`;
+                return (
+                  <Text key={d} style={{ position: 'absolute', left: i * W_SLOT, top: 3, fontSize: 8, color: MUTED, fontWeight: '600' }}>
+                    {lbl}
+                  </Text>
+                );
+              })}
+            </View>
           </View>
         </ScrollView>
       </View>
@@ -189,46 +203,60 @@ function WeightLineChart({ log, unit, onDayPress }: {
 
   return (
     <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
-      <View style={{ width: Y_W, height: CHART_H, position: 'relative' }}>
-        {wTicks.map((t) => (
-          <Text key={t} style={[bc.yLabel, { bottom: Math.max(0, Math.round(((t - lo) / rng) * CHART_H) - 7) }]}>
-            {unit === 'lbs' ? Math.round(t) : t.toFixed(1)}
-          </Text>
-        ))}
+      <View style={{ width: Y_W }}>
+        <View style={{ height: CHART_H, position: 'relative' }}>
+          {wTicks.map((t) => (
+            <Text key={t} style={[bc.yLabel, { bottom: Math.max(0, Math.round(((t - lo) / rng) * CHART_H) - 7) }]}>
+              {unit === 'lbs' ? Math.round(t) : t.toFixed(1)}
+            </Text>
+          ))}
+        </View>
+        <View style={{ height: X_AXIS_H }} />
       </View>
       <ScrollView ref={scrollRef} horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1 }}>
-        <View style={{ width: days.length * W_SLOT, height: CHART_H, position: 'relative' }}>
-          {/* Line segments */}
-          {pts.map((pt, i) => {
-            if (!pt) return null;
-            const next = pts.slice(i + 1).find((p) => p !== null);
-            if (!next) return null;
-            return <LineSeg key={`l${i}`} x1={pt.x} y1={pt.y} x2={next.x} y2={next.y} />;
-          })}
-          {/* Dots */}
-          {pts.map((pt, i) => {
-            if (!pt) return null;
-            const isToday = pt.date === todayYMD();
-            const r = isToday ? 5 : 4;
-            return (
-              <View key={`d${i}`} style={{
-                position: 'absolute',
-                width: r * 2, height: r * 2, borderRadius: r,
-                backgroundColor: isToday ? ACCENT : ACCENT_MID,
-                top: pt.y - r, left: pt.x - r,
-                borderWidth: isToday ? 1.5 : 0, borderColor: TEXT,
-              }} />
-            );
-          })}
-          {/* Tappable slot overlays — rendered last, cover full column height */}
-          {days.map((day, i) => (
-            <TouchableOpacity
-              key={`tap${i}`}
-              style={{ position: 'absolute', left: i * W_SLOT, width: W_SLOT, height: CHART_H }}
-              onPress={() => onDayPress(day)}
-              activeOpacity={0.4}
-            />
-          ))}
+        <View style={{ width: days.length * W_SLOT }}>
+          <View style={{ height: CHART_H, position: 'relative' }}>
+            {pts.map((pt, i) => {
+              if (!pt) return null;
+              const next = pts.slice(i + 1).find((p) => p !== null);
+              if (!next) return null;
+              return <LineSeg key={`l${i}`} x1={pt.x} y1={pt.y} x2={next.x} y2={next.y} />;
+            })}
+            {pts.map((pt, i) => {
+              if (!pt) return null;
+              const isToday = pt.date === todayYMD();
+              const r = isToday ? 5 : 4;
+              return (
+                <View key={`d${i}`} style={{
+                  position: 'absolute',
+                  width: r * 2, height: r * 2, borderRadius: r,
+                  backgroundColor: isToday ? ACCENT : ACCENT_MID,
+                  top: pt.y - r, left: pt.x - r,
+                  borderWidth: isToday ? 1.5 : 0, borderColor: TEXT,
+                }} />
+              );
+            })}
+            {days.map((day, i) => (
+              <TouchableOpacity
+                key={`tap${i}`}
+                style={{ position: 'absolute', left: i * W_SLOT, width: W_SLOT, height: CHART_H }}
+                onPress={() => onDayPress(day)}
+                activeOpacity={0.4}
+              />
+            ))}
+          </View>
+          <View style={{ height: X_AXIS_H, position: 'relative' }}>
+            {days.map((d, i) => {
+              if (i % 5 !== 0) return null;
+              const dt = new Date(d + 'T00:00:00');
+              const lbl = `${dt.toLocaleDateString('en-US', { month: 'short' })} ${dt.getDate()}`;
+              return (
+                <Text key={d} style={{ position: 'absolute', left: i * W_SLOT, top: 3, fontSize: 8, color: MUTED, fontWeight: '600' }}>
+                  {lbl}
+                </Text>
+              );
+            })}
+          </View>
         </View>
       </ScrollView>
     </View>
@@ -320,7 +348,7 @@ function WeightModal({ initialDate, weightLog, unit, onSave, onClose }: {
             onPress={save}
             disabled={!input}
           >
-            <Text style={wm.saveTxt}>Save</Text>
+            <Text style={[wm.saveTxt, !input && wm.saveTxtOff]}>Save</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -350,6 +378,7 @@ const wm = StyleSheet.create({
   saveBtn:       { backgroundColor: ACCENT, borderRadius: 10, paddingVertical: 14, alignItems: 'center' },
   saveBtnOff:    { backgroundColor: CARD },
   saveTxt:       { color: BG, fontWeight: '800', fontSize: 15 },
+  saveTxtOff:    { color: MUTED },
 });
 
 // ── Weight section ────────────────────────────────────────────────────────────
