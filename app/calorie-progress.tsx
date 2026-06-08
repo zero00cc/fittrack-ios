@@ -40,7 +40,6 @@ function BarChart({ history, goals }: { history: any; goals: any }) {
   const values = days.map((d) => dayTotals(history[d]).calories);
   const maxVal = Math.max(goals.calories * 1.3, ...values, 100);
 
-  // Y-axis ticks
   const step   = niceStep(maxVal, 4);
   const yTicks = Array.from({ length: Math.floor(maxVal / step) + 1 }, (_, i) => i * step);
   const chartW = days.length * BAR_SLOT;
@@ -49,80 +48,62 @@ function BarChart({ history, goals }: { history: any; goals: any }) {
     <View style={bc.wrap}>
       <Text style={bc.title}>Last 30 Days</Text>
 
-      <View style={{ flexDirection: 'row' }}>
-        {/* ── Y-axis ── */}
+      <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
+        {/* ── Y-axis panel (fixed, outside scroll) ── */}
         <View style={{ width: Y_W, height: CHART_H, position: 'relative' }}>
           {yTicks.map((v) => (
-            <Text
-              key={v}
-              style={[bc.yLabel, { bottom: (v / maxVal) * CHART_H - 7 }]}
-            >
+            <Text key={v} style={[bc.yLabel, { bottom: Math.round((v / maxVal) * CHART_H) - 7 }]}>
               {fmtTick(v)}
             </Text>
           ))}
         </View>
 
-        {/* ── Scrollable chart ── */}
+        {/* ── Scrollable bars + labels ── */}
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1 }}>
-          <View style={{ width: chartW, height: CHART_H + LABEL_H, position: 'relative' }}>
+          <View style={{ width: chartW }}>
 
-            {/* Gridlines */}
-            {yTicks.map((v) => (
-              <View
-                key={v}
-                style={[bc.gridLine, { bottom: LABEL_H + (v / maxVal) * CHART_H, width: chartW }]}
-              />
-            ))}
+            {/* Bar area — fixed height, relative so gridlines (absolute) anchor here */}
+            <View style={{ height: CHART_H, position: 'relative' }}>
+              {/* Gridlines — absolute 1-px lines, don't affect bar layout */}
+              {yTicks.map((v) => (
+                <View key={v} style={[bc.gridLine, { bottom: Math.round((v / maxVal) * CHART_H), width: chartW }]} />
+              ))}
+              {/* Goal line */}
+              <View style={[bc.targetLine, {
+                bottom: Math.min(CHART_H - 1, Math.round((goals.calories / maxVal) * CHART_H)),
+                width:  chartW,
+              }]} />
 
-            {/* Goal / target line */}
-            <View
-              style={[
-                bc.targetLine,
-                { bottom: LABEL_H + Math.min(CHART_H - 1, (goals.calories / maxVal) * CHART_H), width: chartW },
-              ]}
-            />
-
-            {/* Bars */}
-            <View
-              style={{
-                flexDirection: 'row',
-                alignItems:   'flex-end',
-                position:     'absolute',
-                bottom:       LABEL_H,
-                left:         0,
-                height:       CHART_H,
-              }}
-            >
-              {days.map((date, i) => {
-                const val     = values[i];
-                const h       = val > 0 ? Math.max(4, Math.round((val / maxVal) * CHART_H)) : 3;
-                const color   = calorieColor(val, goals.calories);
-                const isToday = i === days.length - 1;
-                return (
-                  <View key={date} style={{ width: BAR_SLOT, alignItems: 'center' }}>
-                    <View
-                      style={[
-                        bc.bar,
-                        {
-                          width:           BAR_W,
-                          height:          h,
-                          backgroundColor: val > 0 ? color : '#0f172a',
-                          borderWidth:     isToday ? 1.5 : 0,
-                          borderColor:     '#f1f5f9',
-                        },
-                      ]}
-                    />
-                  </View>
-                );
-              })}
+              {/* Bars — normal flex flow, NOT absolutely positioned.
+                  Each slot is CHART_H tall and grows its bar from the bottom
+                  via justifyContent: 'flex-end'. This is cross-platform safe. */}
+              <View style={{ flexDirection: 'row', height: CHART_H }}>
+                {days.map((date, i) => {
+                  const val     = values[i];
+                  const h       = val > 0 ? Math.max(4, Math.round((val / maxVal) * CHART_H)) : 3;
+                  const color   = calorieColor(val, goals.calories);
+                  const isToday = i === days.length - 1;
+                  return (
+                    <View key={date} style={{ width: BAR_SLOT, height: CHART_H, justifyContent: 'flex-end', alignItems: 'center' }}>
+                      <View style={[bc.bar, {
+                        width:           BAR_W,
+                        height:          h,
+                        backgroundColor: val > 0 ? color : '#2d3748',
+                        borderWidth:     isToday ? 1.5 : 0,
+                        borderColor:     '#f1f5f9',
+                      }]} />
+                    </View>
+                  );
+                })}
+              </View>
             </View>
 
-            {/* X-axis labels — every 5 days + today */}
-            <View style={{ flexDirection: 'row', position: 'absolute', bottom: 0, left: 0, height: LABEL_H }}>
+            {/* X-axis label row — separate normal-flow row below bars */}
+            <View style={{ flexDirection: 'row', height: LABEL_H, alignItems: 'center' }}>
               {days.map((date, i) => {
                 const show = i === 0 || i % 5 === 0 || i === days.length - 1;
                 return (
-                  <View key={date} style={{ width: BAR_SLOT, alignItems: 'center', justifyContent: 'flex-end', paddingBottom: 2 }}>
+                  <View key={date} style={{ width: BAR_SLOT, alignItems: 'center' }}>
                     {show && (
                       <Text style={bc.xLabel} numberOfLines={1}>
                         {formatShortDate(date).replace(/\s\d{4}/, '').trim()}
@@ -245,8 +226,8 @@ const cal = StyleSheet.create({
   cellToday:    { backgroundColor: '#0f172a', borderRadius: 8 },
   cellTxt:      { fontSize: 13, color: '#64748b' },
   cellTxtToday: { color: '#f1f5f9', fontWeight: '700' },
-  cellFuture:   { opacity: 0.2 },
-  cellTxtFuture:{ color: '#334155' },
+  cellFuture:   {},                        // visible but non-tappable
+  cellTxtFuture:{ color: '#334155' },     // dimmed text only
   cellDot:      { width: 5, height: 5, borderRadius: 3 },
 });
 
