@@ -298,7 +298,7 @@ function EntryCard({ entry, onEdit, onDelete }: {
 }) {
   return (
     <TouchableOpacity style={ec.card} onPress={onEdit} activeOpacity={0.75}>
-      {entry.imageUri
+      {entry.imageUri && !entry.imageUri.startsWith('blob:')
         ? <Image source={{ uri: entry.imageUri }} style={ec.thumb} />
         : (
           <View style={ec.placeholder}>

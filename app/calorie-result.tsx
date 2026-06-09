@@ -132,7 +132,7 @@ export default function CalorieResultScreen() {
   if (status === 'loading') {
     return (
       <SafeAreaView style={s.safe} edges={['bottom']}>
-        {imageUri ? <Image source={{ uri: imageUri }} style={s.heroImg} /> : null}
+        {imageUri && !imageUri.startsWith('blob:') ? <Image source={{ uri: imageUri }} style={s.heroImg} /> : null}
         <View style={s.loadingBox}>
           <ActivityIndicator size="large" color={ACCENT} />
           <Text style={s.loadingTxt}>Analysing your meal…</Text>
@@ -160,7 +160,7 @@ export default function CalorieResultScreen() {
     <SafeAreaView style={s.safe} edges={['bottom']}>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
-          {imageUri ? <Image source={{ uri: imageUri }} style={s.heroImg} /> : null}
+          {imageUri && !imageUri.startsWith('blob:') ? <Image source={{ uri: imageUri }} style={s.heroImg} /> : null}
 
           {desc ? (
             <View style={s.descBox}>
