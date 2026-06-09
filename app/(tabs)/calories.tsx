@@ -6,6 +6,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useCalorieStore } from '../../hooks/useCalorieStore';
 import { MacroEntry } from '../../types/calorie.types';
 import { dayTotals, calorieColor, generateId } from '../../utils/calorieUtils';
@@ -19,6 +20,7 @@ import {
 } from '../../constants/theme';
 
 const MAX_DAYS_BACK = 7;
+const WEIGHT_KEY    = 'fittrack_weight_log';
 const C_PROTEIN = DIM;
 const C_CARBS   = ACCENT;
 const C_FAT     = ACCENT_DARK;
