@@ -485,7 +485,8 @@ export default function CaloriesScreen() {
     const prev  = prevLogState.current;
     if (prev && prev.date === selectedDate && count > prev.count) {
       const newest = selectedLog.entries[selectedLog.entries.length - 1];
-      showToast(`${newest.name} · +${newest.calories} kcal`);
+      const justAdded = Date.now() - new Date(newest.timestamp).getTime() < 10_000;
+      if (justAdded) showToast(`${newest.name} · +${newest.calories} kcal`);
     }
     prevLogState.current = { date: selectedDate, count };
   }, [selectedLog.entries.length, selectedDate, loaded]);
