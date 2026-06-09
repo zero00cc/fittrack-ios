@@ -5,6 +5,7 @@ import { CalorieHistory, CalorieGoals, MacroEntry } from '../types/calorie.types
 import { todayYMD } from '../utils/dateUtils';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
+import { USER_PROFILE_KEY } from '../utils/nutritionCalc';
 
 const HISTORY_KEY = 'fittrack_calorie_history';
 const GOALS_KEY   = 'fittrack_calorie_settings';
@@ -46,10 +47,20 @@ export function useCalorieStore() {
       if (hRes.data?.data) setHistory(hRes.data.data as CalorieHistory);
       if (sRes.data) {
         setGoals({
-          calories: sRes.data.daily_target        ?? defaultGoals.calories,
-          protein:  sRes.data.protein_target      ?? defaultGoals.protein,
-          carbs:    sRes.data.carbs_target         ?? defaultGoals.carbs,
-          fat:      sRes.data.fat_target           ?? defaultGoals.fat,
+          calories: sRes.data.daily_target    ?? defaultGoals.calories,
+          protein:  sRes.data.protein_target  ?? defaultGoals.protein,
+          carbs:    sRes.data.carbs_target    ?? defaultGoals.carbs,
+          fat:      sRes.data.fat_target      ?? defaultGoals.fat,
+        });
+        // Existing calorie_settings in Supabase means user has done onboarding before.
+        // Ensure the local flag is set so calories screen never redirects to onboarding
+        // even when localStorage was cleared (e.g. private/incognito browser, new device).
+        AsyncStorage.getItem(USER_PROFILE_KEY).then((raw) => {
+          const profile = raw ? JSON.parse(raw) : {};
+          if (!profile.onboardingComplete) {
+            AsyncStorage.setItem(USER_PROFILE_KEY, JSON.stringify({ ...profile, onboardingComplete: true }))
+              .then(undefined, () => {});
+          }
         });
       }
       if (wRes.data?.data) setWeightLog(wRes.data.data as WeightLog);
