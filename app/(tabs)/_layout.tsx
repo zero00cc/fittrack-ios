@@ -1,8 +1,10 @@
 import { Tabs } from 'expo-router';
-import { Text } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 
-function Icon({ label, focused }: { label: string; focused: boolean }) {
-  return <Text style={{ fontSize: 22, opacity: focused ? 1 : 0.5 }}>{label}</Text>;
+type IoniconsName = React.ComponentProps<typeof Ionicons>['name'];
+
+function TabIcon({ name, focused }: { name: IoniconsName; focused: boolean }) {
+  return <Ionicons name={name} size={24} color={focused ? '#37260C' : '#AD8D1A'} />;
 }
 
 export default function TabLayout() {
@@ -11,7 +13,7 @@ export default function TabLayout() {
       screenOptions={{
         headerStyle: { backgroundColor: '#FCFBEA' },
         headerTintColor: '#37260C',
-        headerTitleStyle: { fontWeight: '700', color: '#37260C', fontFamily: 'Helvetica Neue' },
+        headerTitleStyle: { fontWeight: '700', color: '#37260C' },
         tabBarActiveTintColor: '#37260C',
         tabBarInactiveTintColor: '#AD8D1A',
         tabBarStyle: { backgroundColor: '#FCFBEA', borderTopColor: '#E8D961' },
@@ -22,7 +24,7 @@ export default function TabLayout() {
         options={{
           title: 'FitTrack',
           tabBarLabel: 'Home',
-          tabBarIcon: ({ focused }) => <Icon label="🏠" focused={focused} />,
+          tabBarIcon: ({ focused }) => <TabIcon name="home" focused={focused} />,
         }}
       />
       <Tabs.Screen
@@ -30,7 +32,7 @@ export default function TabLayout() {
         options={{
           headerShown: false,
           tabBarLabel: 'Calories',
-          tabBarIcon: ({ focused }) => <Icon label="🥗" focused={focused} />,
+          tabBarIcon: ({ focused }) => <TabIcon name="nutrition" focused={focused} />,
         }}
       />
       <Tabs.Screen
@@ -38,7 +40,7 @@ export default function TabLayout() {
         options={{
           title: 'Workout Plans',
           tabBarLabel: 'Workouts',
-          tabBarIcon: ({ focused }) => <Icon label="🏋️" focused={focused} />,
+          tabBarIcon: ({ focused }) => <TabIcon name="barbell" focused={focused} />,
         }}
       />
       <Tabs.Screen
@@ -46,7 +48,7 @@ export default function TabLayout() {
         options={{
           title: 'Exercise Library',
           tabBarLabel: 'Exercises',
-          tabBarIcon: ({ focused }) => <Icon label="🎬" focused={focused} />,
+          tabBarIcon: ({ focused }) => <TabIcon name="library" focused={focused} />,
         }}
       />
       <Tabs.Screen
@@ -54,7 +56,7 @@ export default function TabLayout() {
         options={{
           title: 'Gallery',
           tabBarLabel: 'Gallery',
-          tabBarIcon: ({ focused }) => <Icon label="📸" focused={focused} />,
+          tabBarIcon: ({ focused }) => <TabIcon name="images" focused={focused} />,
         }}
       />
       <Tabs.Screen
@@ -62,7 +64,7 @@ export default function TabLayout() {
         options={{
           title: 'Leaderboard',
           tabBarLabel: 'Ranking',
-          tabBarIcon: ({ focused }) => <Icon label="🏆" focused={focused} />,
+          tabBarIcon: ({ focused }) => <TabIcon name="trophy" focused={focused} />,
         }}
       />
     </Tabs>
