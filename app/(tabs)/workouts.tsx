@@ -29,8 +29,9 @@ const BENCH_C = '#3b82f6';
 const DL_C    = '#a855f7';
 
 type DailyDateConfirm =
-  | { type: 'add';    dateYMD: string; nextDay: WorkoutDay }
-  | { type: 'remove'; dateYMD: string; dayNumber: number; dayLabel: string };
+  | { type: 'add';     dateYMD: string; nextDay: WorkoutDay }
+  | { type: 'remove';  dateYMD: string; dayNumber: number; dayLabel: string }
+  | { type: 'pending'; dateYMD: string; dayNumber: number; dayLabel: string; day: WorkoutDay };
 
 type IoniconsName = React.ComponentProps<typeof Ionicons>['name'];
 
@@ -72,6 +73,7 @@ export default function WorkoutsScreen() {
     loaded,
     setLevel,
     activatePlan,
+    assignDayDate,
     updateDayStatus,
     updateSetProgress,
     updateExerciseSetBlocks,
@@ -328,11 +330,23 @@ export default function WorkoutsScreen() {
     if (nextDay) setDailyDateConfirm({ type: 'add', dateYMD, nextDay });
   }
 
-  // Tap on a logged date in daily mode → confirm "Remove?"
+  // Tap on a scheduled date in daily mode
   function handleLoggedDailyDateTap(dayNumber: number) {
-    const dateYMD  = workoutState.progress?.completionDates?.[dayNumber];
-    const dayLabel = activePlan?.days.find((d) => d.dayNumber === dayNumber)?.label ?? '';
-    if (dateYMD) setDailyDateConfirm({ type: 'remove', dateYMD, dayNumber, dayLabel });
+    const status = workoutState.progress?.dayStatus[dayNumber] ?? 'unfinished';
+    if (status === 'finished' || status === 'skipped') {
+      // Completed day → confirm "Remove?"
+      const dateYMD  = workoutState.progress?.completionDates?.[dayNumber];
+      const dayLabel = activePlan?.days.find((d) => d.dayNumber === dayNumber)?.label ?? '';
+      if (dateYMD) setDailyDateConfirm({ type: 'remove', dateYMD, dayNumber, dayLabel });
+    } else {
+      // Scheduled but not yet done → show options: start or undo
+      const day = activePlan?.days.find((d) => d.dayNumber === dayNumber);
+      if (day) {
+        const scheduledDate =
+          Object.entries(workoutState.progress?.dateMap ?? {}).find(([, dn]) => dn === dayNumber)?.[0] ?? '';
+        setDailyDateConfirm({ type: 'pending', dateYMD: scheduledDate, dayNumber, dayLabel: day.label, day });
+      }
+    }
   }
 
   function handleDayBlockUpdate(dayNumber: number, exerciseId: string, blockIndex: number, newCount: number) {
@@ -838,18 +852,26 @@ export default function WorkoutsScreen() {
             )}
 
             <Text style={styles.sectionTitle}>Training Days</Text>
-            {trainingDays.map((day) => {
-              const status: DayStatus = workoutState.progress?.dayStatus[day.dayNumber] ?? 'unfinished';
-              return (
-                <TouchableOpacity key={day.dayNumber} style={styles.dayRow} onPress={() => { setSelectedDay(day); setSelectedWorkoutDate(pendingDayDates[day.dayNumber] ?? null); }} activeOpacity={0.7}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.dayLabel}>{day.label}</Text>
-                    <Text style={styles.dayExCount}>{totalExerciseCount(day)} exercises</Text>
-                  </View>
-                  <Text style={[styles.dayStatus, { color: STATUS_COLORS[status] }]}>{STATUS_LABELS[status]}</Text>
-                </TouchableOpacity>
-              );
-            })}
+            <ScrollView
+              style={[styles.daysListScroll, !workoutState.progress && { maxHeight: undefined }]}
+              contentContainerStyle={styles.daysListContent}
+              showsVerticalScrollIndicator
+              nestedScrollEnabled={!!workoutState.progress}
+              scrollEnabled={!!workoutState.progress}
+            >
+              {trainingDays.map((day) => {
+                const status: DayStatus = workoutState.progress?.dayStatus[day.dayNumber] ?? 'unfinished';
+                return (
+                  <TouchableOpacity key={day.dayNumber} style={styles.dayRow} onPress={() => { setSelectedDay(day); setSelectedWorkoutDate(pendingDayDates[day.dayNumber] ?? null); }} activeOpacity={0.7}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.dayLabel}>{day.label}</Text>
+                      <Text style={styles.dayExCount}>{totalExerciseCount(day)} exercises</Text>
+                    </View>
+                    <Text style={[styles.dayStatus, { color: STATUS_COLORS[status] }]}>{STATUS_LABELS[status]}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
 
             {(workoutState.planHistory ?? []).length > 0 && (
               <TouchableOpacity style={styles.historyLink} onPress={() => router.push('/workout-history' as any)}>
@@ -935,7 +957,10 @@ export default function WorkoutsScreen() {
                 style={styles.stopwatchBtn}
                 onPress={() => setShowStopwatch(true)}
               >
-                <Text style={styles.stopwatchBtnText}>⏱ Stopwatch</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Ionicons name="timer-outline" size={18} color="#16a34a" />
+                  <Text style={styles.stopwatchBtnText}>Stopwatch</Text>
+                </View>
               </TouchableOpacity>
             </View>
             {/* Stopwatch overlay — floats above the day detail content */}
@@ -944,69 +969,62 @@ export default function WorkoutsScreen() {
                 <Stopwatch onClose={() => setShowStopwatch(false)} />
               </View>
             )}
-          </SafeAreaView>
-        </Modal>
-      )}
-
-      {/* ── Exercise picker modal ────────────────────────────────── */}
-      {showPicker && selectedDay && (
-        <Modal visible animationType="slide" presentationStyle="pageSheet">
-          <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }}>
-            <View style={styles.modalHeader}>
-              <TouchableOpacity onPress={() => setShowPicker(false)}>
-                <Text style={styles.modalCancel}>Cancel</Text>
-              </TouchableOpacity>
-              <Text style={styles.modalTitle}>Exercise Library</Text>
-              <TouchableOpacity onPress={() => setShowPicker(false)} style={styles.pickerConfirmBtn}>
-                <Text style={styles.pickerConfirmText}>Done</Text>
-              </TouchableOpacity>
-            </View>
-
-            <View style={styles.searchRow}>
-              <TextInput
-                style={styles.searchInput}
-                value={pickerSearch}
-                onChangeText={setPickerSearch}
-                placeholder="Search by name or muscle group…"
-                placeholderTextColor="#9ca3af"
-                clearButtonMode="while-editing"
-                autoFocus
-              />
-            </View>
-
-            <ScrollView contentContainerStyle={{ padding: 12 }}>
-              {filteredLibrary.map((lib) => {
-                const alreadyAdded = dayExerciseIds.has(`custom-${lib.id}`);
-                return (
-                  <TouchableOpacity
-                    key={lib.id}
-                    style={styles.pickerRow}
-                    onPress={() => {
-                      if (!selectedDay) return;
-                      if (alreadyAdded) {
-                        removeCustomExercise(selectedDay.dayNumber, `custom-${lib.id}`);
-                      } else {
-                        addCustomExercise(selectedDay.dayNumber, libraryToExercise(lib));
-                      }
-                    }}
-                    activeOpacity={0.7}
-                  >
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.pickerName}>{lib.name}</Text>
-                      <Text style={styles.pickerMuscles}>{lib.muscleGroups.join(' · ')}</Text>
-                    </View>
-                    {alreadyAdded ? (
-                      <Text style={styles.pickerRemove}>✕ Remove</Text>
-                    ) : (
-                      <Text style={styles.pickerAdd}>+ Add</Text>
-                    )}
+            {/* Exercise picker overlay — inside this modal to avoid iOS nested-modal bug */}
+            {showPicker && (
+              <View style={styles.pickerOverlay}>
+                <View style={styles.modalHeader}>
+                  <TouchableOpacity onPress={() => setShowPicker(false)}>
+                    <Text style={styles.modalCancel}>Cancel</Text>
                   </TouchableOpacity>
-                );
-              })}
-              {filteredLibrary.length === 0 && (
-                <Text style={styles.pickerEmpty}>No exercises match "{pickerSearch}"</Text>
-              )}
-            </ScrollView>
+                  <Text style={styles.modalTitle}>Exercise Library</Text>
+                  <TouchableOpacity onPress={() => setShowPicker(false)} style={styles.pickerConfirmBtn}>
+                    <Text style={styles.pickerConfirmText}>Done</Text>
+                  </TouchableOpacity>
+                </View>
+                <View style={styles.searchRow}>
+                  <TextInput
+                    style={styles.searchInput}
+                    value={pickerSearch}
+                    onChangeText={setPickerSearch}
+                    placeholder="Search by name or muscle group…"
+                    placeholderTextColor="#9ca3af"
+                    clearButtonMode="while-editing"
+                  />
+                </View>
+                <ScrollView contentContainerStyle={{ padding: 12 }} keyboardShouldPersistTaps="handled">
+                  {filteredLibrary.map((lib) => {
+                    const alreadyAdded = dayExerciseIds.has(`custom-${lib.id}`);
+                    return (
+                      <TouchableOpacity
+                        key={lib.id}
+                        style={styles.pickerRow}
+                        onPress={() => {
+                          if (alreadyAdded) {
+                            removeCustomExercise(selectedDay.dayNumber, `custom-${lib.id}`);
+                          } else {
+                            addCustomExercise(selectedDay.dayNumber, libraryToExercise(lib));
+                          }
+                        }}
+                        activeOpacity={0.7}
+                      >
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.pickerName}>{lib.name}</Text>
+                          <Text style={styles.pickerMuscles}>{lib.muscleGroups.join(' · ')}</Text>
+                        </View>
+                        {alreadyAdded ? (
+                          <Text style={styles.pickerRemove}>✕ Remove</Text>
+                        ) : (
+                          <Text style={styles.pickerAdd}>+ Add</Text>
+                        )}
+                      </TouchableOpacity>
+                    );
+                  })}
+                  {filteredLibrary.length === 0 && (
+                    <Text style={styles.pickerEmpty}>No exercises match "{pickerSearch}"</Text>
+                  )}
+                </ScrollView>
+              </View>
+            )}
           </SafeAreaView>
         </Modal>
       )}
@@ -1125,15 +1143,19 @@ export default function WorkoutsScreen() {
           >
             <View style={styles.confirmCard}>
               <Text style={styles.confirmTitle}>
-                {dailyDateConfirm.type === 'add' ? 'Add to Calendar?' : 'Remove from Calendar?'}
+                {dailyDateConfirm.type === 'add'     ? 'Add to Calendar?' :
+                 dailyDateConfirm.type === 'pending' ? dailyDateConfirm.dayLabel :
+                                                       'Remove from Calendar?'}
               </Text>
               <Text style={styles.confirmDate}>{isoToDisplay(dailyDateConfirm.dateYMD)}</Text>
 
               {dailyDateConfirm.type === 'add' ? (
                 <Text style={styles.confirmBody}>
-                  Opens{' '}
+                  Schedules{' '}
                   <Text style={styles.confirmBold}>{dailyDateConfirm.nextDay.label}</Text>
                 </Text>
+              ) : dailyDateConfirm.type === 'pending' ? (
+                <Text style={styles.confirmBody}>Scheduled — not yet started</Text>
               ) : (
                 <Text style={styles.confirmBody}>
                   Clears all progress for{'\n'}
@@ -1141,28 +1163,20 @@ export default function WorkoutsScreen() {
                 </Text>
               )}
 
-              <View style={styles.confirmBtns}>
-                <TouchableOpacity
-                  onPress={() => setDailyDateConfirm(null)}
-                  style={styles.confirmCancelBtn}
-                >
-                  <Text style={styles.confirmCancelText}>Cancel</Text>
-                </TouchableOpacity>
-
-                {dailyDateConfirm.type === 'add' ? (
+              {dailyDateConfirm.type === 'pending' ? (
+                <View style={styles.confirmBtnsCol}>
                   <TouchableOpacity
                     onPress={() => {
-                      const { dateYMD, nextDay } = dailyDateConfirm;
+                      const { dateYMD, dayNumber, day } = dailyDateConfirm;
                       setDailyDateConfirm(null);
-                      setPendingDayDates((prev) => ({ ...prev, [nextDay.dayNumber]: dateYMD }));
-                      setSelectedWorkoutDate(dateYMD);
-                      setSelectedDay(nextDay);
+                      setPendingDayDates((prev) => dateYMD ? { ...prev, [dayNumber]: dateYMD } : prev);
+                      setSelectedWorkoutDate(dateYMD || null);
+                      setSelectedDay(day);
                     }}
                     style={styles.confirmAddBtn}
                   >
-                    <Text style={styles.confirmAddText}>Add Day</Text>
+                    <Text style={styles.confirmAddText}>Start Workout</Text>
                   </TouchableOpacity>
-                ) : (
                   <TouchableOpacity
                     onPress={() => {
                       resetDayProgress(dailyDateConfirm.dayNumber);
@@ -1170,10 +1184,46 @@ export default function WorkoutsScreen() {
                     }}
                     style={styles.confirmRemoveBtn}
                   >
-                    <Text style={styles.confirmRemoveText}>Remove</Text>
+                    <Text style={styles.confirmRemoveText}>Remove from Calendar</Text>
                   </TouchableOpacity>
-                )}
-              </View>
+                  <TouchableOpacity onPress={() => setDailyDateConfirm(null)}>
+                    <Text style={styles.confirmCancelText}>Cancel</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <View style={styles.confirmBtns}>
+                  <TouchableOpacity
+                    onPress={() => setDailyDateConfirm(null)}
+                    style={styles.confirmCancelBtn}
+                  >
+                    <Text style={styles.confirmCancelText}>Cancel</Text>
+                  </TouchableOpacity>
+
+                  {dailyDateConfirm.type === 'add' ? (
+                    <TouchableOpacity
+                      onPress={() => {
+                        const { dateYMD, nextDay } = dailyDateConfirm;
+                        setDailyDateConfirm(null);
+                        setPendingDayDates((prev) => ({ ...prev, [nextDay.dayNumber]: dateYMD }));
+                        assignDayDate(nextDay.dayNumber, dateYMD);
+                      }}
+                      style={[styles.confirmAddBtn, { flex: 1 }]}
+                    >
+                      <Text style={styles.confirmAddText}>Add Day</Text>
+                    </TouchableOpacity>
+                  ) : (
+                    <TouchableOpacity
+                      onPress={() => {
+                        resetDayProgress(dailyDateConfirm.dayNumber);
+                        setDailyDateConfirm(null);
+                      }}
+                      style={[styles.confirmRemoveBtn, { flex: 1 }]}
+                    >
+                      <Text style={styles.confirmRemoveText}>Remove</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              )}
             </View>
           </TouchableOpacity>
         </Modal>
@@ -1225,7 +1275,7 @@ const styles = StyleSheet.create({
   resetBtnText: { color: '#ef4444', fontSize: 12, fontWeight: '700' },
   confirmRow: { flexDirection: 'row', gap: 6, alignItems: 'center' },
   confirmCancelBtn: { backgroundColor: '#f3f4f6', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 },
-  confirmCancelText: { color: '#6b7280', fontSize: 12, fontWeight: '600' },
+  confirmCancelText: { color: '#6b7280', fontSize: 12, fontWeight: '600', textAlign: 'center', paddingVertical: 4 },
   confirmResetBtn: { backgroundColor: '#ef4444', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 },
   confirmResetText: { color: '#fff', fontSize: 12, fontWeight: '700' },
   // Daily date confirm modal
@@ -1235,12 +1285,15 @@ const styles = StyleSheet.create({
   confirmDate: { fontSize: 14, fontWeight: '600', color: '#6366f1', textAlign: 'center' },
   confirmBody: { fontSize: 13, color: '#6b7280', textAlign: 'center', lineHeight: 19 },
   confirmBold: { fontWeight: '700', color: '#111827' },
-  confirmBtns: { flexDirection: 'row', gap: 10, marginTop: 6 },
-  confirmAddBtn: { flex: 1, backgroundColor: '#10b981', borderRadius: 12, paddingVertical: 12, alignItems: 'center' },
+  confirmBtns:    { flexDirection: 'row', gap: 10, marginTop: 6 },
+  confirmBtnsCol: { flexDirection: 'column', gap: 8, marginTop: 6 },
+  confirmAddBtn: { backgroundColor: '#10b981', borderRadius: 12, paddingVertical: 12, alignItems: 'center' },
   confirmAddText: { color: '#fff', fontSize: 14, fontWeight: '700' },
-  confirmRemoveBtn: { flex: 1, backgroundColor: '#ef4444', borderRadius: 12, paddingVertical: 12, alignItems: 'center' },
+  confirmRemoveBtn: { backgroundColor: '#ef4444', borderRadius: 12, paddingVertical: 12, alignItems: 'center' },
   confirmRemoveText: { color: '#fff', fontSize: 14, fontWeight: '700' },
   sectionTitle: { fontSize: 14, fontWeight: '700', color: '#111827' },
+  daysListScroll:   { maxHeight: 300 },
+  daysListContent:  { gap: 8, paddingBottom: 2 },
   dayRow: { backgroundColor: '#fff', borderRadius: 12, padding: 14, flexDirection: 'row', alignItems: 'center', shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 4, shadowOffset: { width: 0, height: 1 } },
   dayLabel: { fontSize: 13, fontWeight: '600', color: '#111827' },
   dayExCount: { fontSize: 11, color: '#9ca3af', marginTop: 2 },
@@ -1261,6 +1314,7 @@ const styles = StyleSheet.create({
   stopwatchBtn: { marginTop: 8, backgroundColor: '#f0fdf4', borderRadius: 12, padding: 14, alignItems: 'center', borderWidth: 1, borderColor: '#bbf7d0' },
   stopwatchBtnText: { color: '#16a34a', fontWeight: '700', fontSize: 14 },
   stopwatchOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 24 },
+  pickerOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: '#fff', zIndex: 10 },
   addExerciseBtn: {
     marginTop: 12,
     paddingVertical: 14,
