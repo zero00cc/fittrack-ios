@@ -65,6 +65,7 @@ All tabs live in `app/(tabs)/`: `index`, `calories`, `workouts`, `exercises`, `g
 | `calorie-settings.tsx` | push | Edit profile & recalculate goals; reads/writes `fittrack_user_profile` |
 | `calorie-progress.tsx` | push | Progress & History — 30-day chart and editable past logs |
 | `calorie-result.tsx` | modal | Meal details — shows AI-analyzed items from a food photo for review before saving |
+| `workout-history.tsx` | push | Completed plan history, activity calendar, and personal-record (PR) log for Squat/Bench/Deadlift |
 
 ### Calorie onboarding & nutrition calculation
 
@@ -90,6 +91,8 @@ When a plan is activated, `PlanMode` is chosen: `'scheduled'` (each training day
 ### Workout plan completion & history
 
 When all training days are marked `finished` or `skipped`, `checkPlanCompletion()` in `workouts.tsx` builds a `CompletedPlan` record and calls `recordCompletedPlan()` from `useWorkoutStore`. This appends to `workoutState.planHistory` and clears the active plan atomically — the planHistory is persisted inside the `workout_state` Supabase row (not a separate table).
+
+`WorkoutState.prLog` (`PersonalRecord[]`) stores timestamped Squat/Bench/Deadlift maxes in kg. Records are managed in `workout-history.tsx` (the PR log tab) and written via `useWorkoutStore`. `PersonalRecord` fields: `{ id, date (YYYY-MM-DD), squat | null, bench | null, deadlift | null }`.
 
 ### Ranking / leaderboard
 

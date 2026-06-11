@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
-  StyleSheet, ActivityIndicator,
+  StyleSheet, ActivityIndicator, Animated,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -33,6 +33,17 @@ export default function CalorieSettingsScreen() {
   const [protGoal, setProtGoal] = useState('150');
   const [carbGoal, setCarbGoal] = useState('200');
   const [fatGoal,  setFatGoal]  = useState('65');
+
+  const toastAnim = useRef(new Animated.Value(0)).current;
+
+  function showRecalcToast() {
+    toastAnim.setValue(0);
+    Animated.sequence([
+      Animated.timing(toastAnim, { toValue: 1, duration: 220, useNativeDriver: true }),
+      Animated.delay(1300),
+      Animated.timing(toastAnim, { toValue: 0, duration: 280, useNativeDriver: true }),
+    ]).start();
+  }
 
   useEffect(() => {
     Promise.all([
@@ -67,6 +78,7 @@ export default function CalorieSettingsScreen() {
     const rec = calcPlan({ sex, goal, activityLevel: activity, age: parseInt(age) || 25, weightKg: weightKg || 70, heightCm: heightCm || 170 });
     setCalGoal(String(rec.calories)); setProtGoal(String(rec.protein));
     setCarbGoal(String(rec.carbs));   setFatGoal(String(rec.fat));
+    showRecalcToast();
   }
 
   async function save() {
@@ -195,6 +207,17 @@ export default function CalorieSettingsScreen() {
         </TouchableOpacity>
 
       </ScrollView>
+
+      <Animated.View
+        pointerEvents="none"
+        style={[s.toast, {
+          opacity: toastAnim,
+          transform: [{ scale: toastAnim.interpolate({ inputRange: [0, 1], outputRange: [0.82, 1] }) }],
+        }]}
+      >
+        <Text style={s.toastIcon}>✓</Text>
+        <Text style={s.toastTxt}>Goals recalculated!</Text>
+      </Animated.View>
     </SafeAreaView>
   );
 }
@@ -245,4 +268,8 @@ const s = StyleSheet.create({
 
   saveBtn:       { backgroundColor: ACCENT, borderRadius: 10, paddingVertical: 12, alignItems: 'center' },
   saveTxt:       { color: BG, fontSize: 14, fontWeight: '800' },
+
+  toast:         { position: 'absolute', bottom: 28, alignSelf: 'center', backgroundColor: ACCENT, borderRadius: 24, paddingVertical: 10, paddingHorizontal: 18, flexDirection: 'row', alignItems: 'center', gap: 7, shadowColor: '#000', shadowOpacity: 0.18, shadowRadius: 10, shadowOffset: { width: 0, height: 3 }, elevation: 6 },
+  toastIcon:     { color: BG, fontSize: 15, fontWeight: '900' },
+  toastTxt:      { color: BG, fontSize: 13, fontWeight: '700', letterSpacing: 0.2 },
 });

@@ -25,13 +25,9 @@ export function WorkoutCalendar({ progress, trainingDayNumbers, onPressDay, onPr
   const [month, setMonth] = useState(() => parseInt(today.slice(5, 7)) - 1);
 
   const effectiveDateMap = useMemo<{ [date: string]: number }>(() => {
-    // scheduled mode: use the pre-built dateMap from plan activation
-    if ((progress.mode ?? 'daily') === 'scheduled' && progress.dateMap) {
-      return progress.dateMap;
-    }
-    // daily mode: no pre-assigned dates — calendar only fills in as workouts are logged
-    return {};
-  }, [progress.mode, progress.dateMap]);
+    // both modes: use dateMap so daily-mode scheduled (pending) days appear as upcoming
+    return progress.dateMap ?? {};
+  }, [progress.dateMap]);
 
   const completionDateMap = useMemo<{ [date: string]: number }>(() => {
     const map: { [date: string]: number } = {};

@@ -176,6 +176,16 @@ export function useWorkoutStore() {
     [setWorkoutState],
   );
 
+  const assignDayDate = useCallback(
+    (dayNumber: number, dateYMD: string) =>
+      setWorkoutState((prev) => {
+        if (!prev.progress) return prev;
+        const dateMap = { ...(prev.progress.dateMap ?? {}), [dateYMD]: dayNumber };
+        return { ...prev, progress: { ...prev.progress, dateMap } };
+      }),
+    [setWorkoutState],
+  );
+
   const resetDayProgress = useCallback(
     (dayNumber: number) =>
       setWorkoutState((prev) => {
@@ -183,12 +193,16 @@ export function useWorkoutStore() {
         const dayStatus       = { ...prev.progress.dayStatus };
         const completionDates = { ...(prev.progress.completionDates ?? {}) };
         const setProgress     = { ...(prev.progress.setProgress ?? {}) };
+        // Also remove any scheduled date for this day from the dateMap
+        const dateMap = Object.fromEntries(
+          Object.entries(prev.progress.dateMap ?? {}).filter(([, dn]) => dn !== dayNumber),
+        );
         delete dayStatus[dayNumber];
         delete completionDates[dayNumber];
         delete setProgress[dayNumber];
         return {
           ...prev,
-          progress: { ...prev.progress, dayStatus, completionDates, setProgress },
+          progress: { ...prev.progress, dayStatus, completionDates, setProgress, dateMap },
         };
       }),
     [setWorkoutState],
@@ -266,6 +280,7 @@ export function useWorkoutStore() {
     loaded,
     setLevel,
     activatePlan,
+    assignDayDate,
     updateDayStatus,
     updateSetProgress,
     updateExerciseSetBlocks,
