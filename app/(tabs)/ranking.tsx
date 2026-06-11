@@ -296,8 +296,13 @@ export default function RankingScreen() {
               const isMe = entry.userId === myProfile?.userId;
               return (
                 <View key={entry.userId} style={[styles.tableRow, isMe && styles.tableRowMe, i % 2 === 1 && styles.tableRowAlt]}>
-                  <Text style={[styles.tableCell, styles.rankCell, styles.rankText, i < 3 && styles.rankTop]}>
-                    {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : i + 1}
+                  <Text style={[
+                    styles.tableCell, styles.rankCell, styles.rankText,
+                    i === 0 && { color: '#f59e0b' },
+                    i === 1 && { color: '#94a3b8' },
+                    i === 2 && { color: '#b45309' },
+                  ]}>
+                    {i + 1}
                   </Text>
                   <Text style={[styles.tableCell, styles.nameCell, styles.nameText]} numberOfLines={1}>
                     {entry.displayName}{isMe ? ' (you)' : ''}
