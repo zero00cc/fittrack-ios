@@ -53,6 +53,34 @@ function totalBlocks(ex: Exercise): SetBlock[] {
   return ex.setBlocks ?? [{ sets: ex.sets ?? 1, reps: null, rpe: null, load: null }];
 }
 
+const LIFT_GROUPS = [
+  { label: 'Squat',    test: (n: string) => /squat/i.test(n) },
+  { label: 'Bench',    test: (n: string) => /bench|spoto/i.test(n) },
+  { label: 'Deadlift', test: (n: string) => /deadlift/i.test(n) && !/romanian/i.test(n) },
+  { label: 'Row',      test: (n: string) => /row/i.test(n) },
+  { label: 'Pull',     test: (n: string) => /pull/i.test(n) },
+  { label: 'Press',    test: (n: string) => /press/i.test(n) },
+];
+
+function getPlanStats(plan: WorkoutPlan): { daysPerWeek: number; lifts: string[] } {
+  const daysPerWeek = plan.defaultWeeklySchedule.length;
+  const week1 = plan.days.filter((d) => d.weekNumber === 1 && !d.isRestDay);
+  const counts: Record<string, number> = {};
+  week1.forEach((day) => {
+    day.exercises.forEach((ex) => {
+      for (const g of LIFT_GROUPS) {
+        if (g.test(ex.name)) { counts[g.label] = (counts[g.label] ?? 0) + 1; break; }
+      }
+    });
+  });
+  const lifts = Object.entries(counts)
+    .filter(([, c]) => c >= 2)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 4)
+    .map(([label, count]) => `${label} ${count}×`);
+  return { daysPerWeek, lifts };
+}
+
 function isExerciseDone(ex: Exercise, progress: Record<string, number>): boolean {
   return totalBlocks(ex).every((b, i) => (progress[blockKey(ex.id, i)] ?? 0) >= b.sets);
 }
@@ -746,18 +774,24 @@ export default function WorkoutsScreen() {
               <Text style={styles.emptyDesc}>Plans for this level are coming soon.</Text>
             </View>
           ) : (
-            filteredPlans.map((plan) => (
-              <TouchableOpacity key={plan.id} style={styles.planCard} onPress={() => handleSelectPlan(plan.id)} activeOpacity={0.8}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.planName}>{plan.name}</Text>
-                  <Text style={styles.planDesc} numberOfLines={3}>{plan.description}</Text>
-                </View>
-                <View style={{ alignItems: 'flex-end' }}>
-                  <Text style={styles.planWeeks}>{plan.durationWeeks}w</Text>
-                  <Text style={styles.planWeeksLabel}>duration</Text>
-                </View>
-              </TouchableOpacity>
-            ))
+            filteredPlans.map((plan) => {
+              const { daysPerWeek, lifts } = getPlanStats(plan);
+              return (
+                <TouchableOpacity key={plan.id} style={styles.planCard} onPress={() => handleSelectPlan(plan.id)} activeOpacity={0.8}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.planName}>{plan.name}</Text>
+                    <Text style={styles.planDesc}>{plan.durationWeeks} weeks · {daysPerWeek} days/week</Text>
+                    {lifts.length > 0 && (
+                      <Text style={styles.planDesc}>{lifts.join(' · ')} per week</Text>
+                    )}
+                  </View>
+                  <View style={{ alignItems: 'flex-end' }}>
+                    <Text style={styles.planWeeks}>{plan.durationWeeks}w</Text>
+                    <Text style={styles.planWeeksLabel}>duration</Text>
+                  </View>
+                </TouchableOpacity>
+              );
+            })
           )}
 
         </ScrollView>
