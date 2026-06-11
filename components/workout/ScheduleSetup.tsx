@@ -177,36 +177,43 @@ export function ScheduleSetup({ plan, onConfirm, onCancel }: Props) {
 
         {/* ── Training days list ── */}
         <Text style={styles.sectionTitle}>Training Days</Text>
-        {trainingDays.map((day, idx) => {
-          const dn         = day.dayNumber;
-          const dateForDay = assigned[dn];
-          const isActive   = activeDayNum === dn;
+        <ScrollView
+          style={styles.daysListScroll}
+          contentContainerStyle={styles.daysListContent}
+          showsVerticalScrollIndicator
+          nestedScrollEnabled
+        >
+          {trainingDays.map((day, idx) => {
+            const dn         = day.dayNumber;
+            const dateForDay = assigned[dn];
+            const isActive   = activeDayNum === dn;
 
-          return (
-            <TouchableOpacity
-              key={dn}
-              style={[styles.dayRow, isActive && styles.dayRowActive]}
-              onPress={() => setActiveDayNum(dn)}
-              activeOpacity={0.75}
-            >
-              <View style={[styles.badge, dateForDay ? styles.badgeDone : isActive && styles.badgeActive]}>
-                <Text style={[styles.badgeText, (dateForDay || isActive) && styles.badgeTextLight]}>
-                  {idx + 1}
-                </Text>
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.dayLabel} numberOfLines={1}>{day.label}</Text>
-                {dateForDay
-                  ? <Text style={styles.dateAssigned}>{fmtDate(dateForDay)}</Text>
-                  : <Text style={styles.dateEmpty}>
-                      {isActive ? 'Tap a date on the calendar ↑' : 'Not scheduled'}
-                    </Text>
-                }
-              </View>
-              {isActive && <Text style={styles.activeArrow}>→</Text>}
-            </TouchableOpacity>
-          );
-        })}
+            return (
+              <TouchableOpacity
+                key={dn}
+                style={[styles.dayRow, isActive && styles.dayRowActive]}
+                onPress={() => setActiveDayNum(dn)}
+                activeOpacity={0.75}
+              >
+                <View style={[styles.badge, dateForDay ? styles.badgeDone : isActive && styles.badgeActive]}>
+                  <Text style={[styles.badgeText, (dateForDay || isActive) && styles.badgeTextLight]}>
+                    {idx + 1}
+                  </Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.dayLabel} numberOfLines={1}>{day.label}</Text>
+                  {dateForDay
+                    ? <Text style={styles.dateAssigned}>{fmtDate(dateForDay)}</Text>
+                    : <Text style={styles.dateEmpty}>
+                        {isActive ? 'Tap a date on the calendar ↑' : 'Not scheduled'}
+                      </Text>
+                  }
+                </View>
+                {isActive && <Text style={styles.activeArrow}>→</Text>}
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
       </ScrollView>
     </SafeAreaView>
   );
@@ -261,7 +268,9 @@ const styles = StyleSheet.create({
   dayNum:      { fontSize: 13, fontWeight: '600', color: '#374151' },
   dayNumToday: { color: '#6366f1' },
 
-  sectionTitle: { fontSize: 14, fontWeight: '700', color: '#111827' },
+  sectionTitle:    { fontSize: 14, fontWeight: '700', color: '#111827' },
+  daysListScroll:  { maxHeight: 280 },
+  daysListContent: { gap: 8, paddingBottom: 2 },
 
   dayRow: {
     backgroundColor: '#fff',

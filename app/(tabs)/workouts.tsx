@@ -853,11 +853,10 @@ export default function WorkoutsScreen() {
 
             <Text style={styles.sectionTitle}>Training Days</Text>
             <ScrollView
-              style={[styles.daysListScroll, !workoutState.progress && { maxHeight: undefined }]}
+              style={styles.daysListScroll}
               contentContainerStyle={styles.daysListContent}
               showsVerticalScrollIndicator
-              nestedScrollEnabled={!!workoutState.progress}
-              scrollEnabled={!!workoutState.progress}
+              nestedScrollEnabled
             >
               {trainingDays.map((day) => {
                 const status: DayStatus = workoutState.progress?.dayStatus[day.dayNumber] ?? 'unfinished';
