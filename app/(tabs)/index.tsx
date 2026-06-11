@@ -33,7 +33,7 @@ export default function HomeScreen() {
       {/* Header */}
       <View style={styles.header}>
         <View>
-          <Text style={styles.heroTitle}>FitTrack</Text>
+          <Text style={styles.heroTitle}>Train hard. Get stronger.</Text>
           {user && <Text style={styles.userEmail}>{user.email}</Text>}
         </View>
         <TouchableOpacity style={styles.signOutBtn} onPress={signOut} activeOpacity={0.8}>
