@@ -1,4 +1,5 @@
 import { Modal, View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { PlanMode } from '../../types/workout.types';
 
 interface Props {
@@ -21,7 +22,7 @@ export function ModePicker({ visible, planName, onSelect, onCancel }: Props) {
             onPress={() => onSelect('scheduled')}
             activeOpacity={0.8}
           >
-            <Text style={styles.optionIcon}>📅</Text>
+            <Ionicons name="calendar" size={26} color="#6366f1" style={styles.optionIcon} />
             <View style={{ flex: 1 }}>
               <Text style={styles.optionTitle}>Schedule All at Once</Text>
               <Text style={styles.optionDesc}>
@@ -35,7 +36,7 @@ export function ModePicker({ visible, planName, onSelect, onCancel }: Props) {
             onPress={() => onSelect('daily')}
             activeOpacity={0.8}
           >
-            <Text style={styles.optionIcon}>✍️</Text>
+            <Ionicons name="create" size={26} color="#10b981" style={styles.optionIcon} />
             <View style={{ flex: 1 }}>
               <Text style={styles.optionTitle}>Day by Day</Text>
               <Text style={styles.optionDesc}>
@@ -91,7 +92,7 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: '#e5e7eb',
   },
-  optionIcon: { fontSize: 26, marginTop: 1 },
+  optionIcon: { marginTop: 1 },
   optionTitle: { fontSize: 14, fontWeight: '700', color: '#111827', marginBottom: 3 },
   optionDesc: { fontSize: 12, color: '#6b7280', lineHeight: 17 },
   cancelBtn: { alignItems: 'center', paddingVertical: 6 },
