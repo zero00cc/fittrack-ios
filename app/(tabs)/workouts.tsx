@@ -248,6 +248,7 @@ export default function WorkoutsScreen() {
     setPendingDateMap(undefined);
     setPrSquat(''); setPrBench(''); setPrDeadlift('');
     setShowPRInput(true);
+    setView('detail'); // fall through to the return that renders the modal
   }
 
   function doActivatePlanWithPR() {
@@ -599,12 +600,101 @@ export default function WorkoutsScreen() {
     );
   }
 
-  // ── Level selector ──────────────────────────────────────────────
+  // ── Level selector with "Today's Training" card ────────────────
   if (view === 'level') {
+    const today = todayYMD();
+
+    // Scheduled mode: check if today maps to a plan day
+    const scheduledTodayNum = workoutState.progress?.mode === 'scheduled'
+      ? (workoutState.progress.dateMap?.[today] ?? null)
+      : null;
+    const scheduledTodayDay = scheduledTodayNum
+      ? activePlan?.days.find((d) => d.dayNumber === scheduledTodayNum) ?? null
+      : null;
+
+    // Next unfinished training day (daily mode or fallback)
+    const nextUnfinishedDay = trainingDays.find(
+      (d) => (workoutState.progress?.dayStatus[d.dayNumber] ?? 'unfinished') === 'unfinished',
+    ) ?? null;
+
+    const displayDay = scheduledTodayDay ?? nextUnfinishedDay;
+    const displayStatus: DayStatus = displayDay
+      ? (workoutState.progress?.dayStatus[displayDay.dayNumber] ?? 'unfinished')
+      : 'unfinished';
+    const isRestToday = workoutState.progress?.mode === 'scheduled' && !scheduledTodayDay && !!activePlan;
+
+    // Plan progress
+    const doneDays = trainingDays.filter(
+      (d) => (workoutState.progress?.dayStatus[d.dayNumber] ?? 'unfinished') !== 'unfinished',
+    ).length;
+    const pct = trainingDays.length > 0 ? doneDays / trainingDays.length : 0;
+
     return (
       <SafeAreaView style={styles.safe} edges={['bottom']}>
         <ScrollView contentContainerStyle={styles.scroll}>
-          <Text style={styles.pageTitle}>Select Training Level</Text>
+
+          {/* ── Today's Training card ─────────────────────────────── */}
+          <View style={styles.todayCard}>
+            <View style={styles.todayCardTop}>
+              <Text style={styles.todayCardTitle}>Today's Training</Text>
+              <TouchableOpacity onPress={() => router.push('/workout-history' as any)}>
+                <Text style={styles.todayHistoryLink}>History →</Text>
+              </TouchableOpacity>
+            </View>
+
+            {activePlan ? (
+              <TouchableOpacity onPress={() => setView('detail')} activeOpacity={0.8}>
+                <Text style={styles.todayPlanName}>{activePlan.name}</Text>
+                <Text style={styles.todayPlanLevel}>
+                  {LEVELS.find((l) => l.id === activePlan.level)?.label ?? activePlan.level}
+                </Text>
+
+                {/* Progress bar */}
+                {workoutState.progress && (
+                  <View style={{ marginTop: 10, gap: 4 }}>
+                    <View style={styles.todayBar}>
+                      <View style={[styles.todayBarFill, { width: `${Math.round(pct * 100)}%` as any }]} />
+                    </View>
+                    <Text style={styles.todayBarLabel}>
+                      {doneDays}/{trainingDays.length} days · tap to open plan
+                    </Text>
+                  </View>
+                )}
+
+                {/* Today's workout */}
+                <View style={styles.todayDayBox}>
+                  {isRestToday ? (
+                    <Text style={styles.todayRestText}>Rest day today</Text>
+                  ) : displayDay ? (
+                    <View style={styles.todayDayRow}>
+                      <View style={[styles.todayDot, { backgroundColor: STATUS_COLORS[displayStatus] }]} />
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.todayDayName}>
+                          {scheduledTodayDay ? displayDay.label : `Next: ${displayDay.label}`}
+                        </Text>
+                        <Text style={styles.todayDayEx}>{displayDay.exercises.length} exercises</Text>
+                      </View>
+                      <Text style={[styles.todayDayStatusTxt, { color: STATUS_COLORS[displayStatus] }]}>
+                        {STATUS_LABELS[displayStatus]}
+                      </Text>
+                    </View>
+                  ) : (
+                    <Text style={styles.todayRestText}>All training days complete 🎉</Text>
+                  )}
+                </View>
+              </TouchableOpacity>
+            ) : (
+              <View style={styles.todayEmpty}>
+                <Text style={styles.todayEmptyText}>No active plan</Text>
+                <Text style={styles.todayEmptySub}>Choose a training level below to get started.</Text>
+              </View>
+            )}
+          </View>
+
+          {/* ── Training level cards ──────────────────────────────── */}
+          <Text style={styles.levelSectionTitle}>
+            {activePlan ? 'Change Plan' : 'Select Training Level'}
+          </Text>
           {LEVELS.map((l) => (
             <TouchableOpacity
               key={l.id}
@@ -621,35 +711,6 @@ export default function WorkoutsScreen() {
               </View>
             </TouchableOpacity>
           ))}
-
-          {(workoutState.planHistory ?? []).length > 0 && (
-            <TouchableOpacity
-              style={styles.historyBox}
-              onPress={() => router.push('/workout-history' as any)}
-              activeOpacity={0.85}
-            >
-              <Text style={styles.historyBoxTitle}>Completed Plans & PRs →</Text>
-              {workoutState.planHistory.map((record) => (
-                <View
-                  key={record.id}
-                  style={styles.historyBoxRow}
-                >
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.historyBoxPlanName}>{record.planName}</Text>
-                    <Text style={styles.historyBoxDates}>
-                      {isoToDisplay(record.startDate)} → {isoToDisplay(record.completedDate)}
-                    </Text>
-                  </View>
-                  <View style={styles.historyBoxBadge}>
-                    <Text style={styles.historyBoxBadgeText}>
-                      {record.finishedDays}/{record.totalDays}
-                    </Text>
-                    <Text style={styles.historyBoxBadgeLabel}>done</Text>
-                  </View>
-                </View>
-              ))}
-            </TouchableOpacity>
-          )}
         </ScrollView>
       </SafeAreaView>
     );
@@ -709,6 +770,7 @@ export default function WorkoutsScreen() {
           setPendingDateMap(dateMap);
           setPrSquat(''); setPrBench(''); setPrDeadlift('');
           setShowPRInput(true);
+          setView('detail'); // fall through to the return that renders the modal
         }}
         onCancel={() => {
           setPendingPlanId(null);
@@ -1128,6 +1190,27 @@ const styles = StyleSheet.create({
   pageTitle: { fontSize: 20, fontWeight: '800', color: '#111827', marginBottom: 4 },
   backBtn: { marginBottom: 4 },
   backBtnText: { color: '#10b981', fontSize: 14, fontWeight: '600' },
+  // Today's Training card
+  todayCard:         { backgroundColor: '#fff', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#e5e7eb', shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 8, shadowOffset: { width: 0, height: 2 } },
+  todayCardTop:      { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  todayCardTitle:    { fontSize: 15, fontWeight: '700', color: '#111827' },
+  todayHistoryLink:  { fontSize: 13, fontWeight: '700', color: '#6366f1' },
+  todayPlanName:     { fontSize: 16, fontWeight: '800', color: '#111827' },
+  todayPlanLevel:    { fontSize: 11, color: '#9ca3af', fontWeight: '600', marginTop: 2, textTransform: 'uppercase', letterSpacing: 0.4 },
+  todayBar:          { height: 5, backgroundColor: '#e5e7eb', borderRadius: 3, overflow: 'hidden' },
+  todayBarFill:      { height: 5, backgroundColor: '#10b981', borderRadius: 3 },
+  todayBarLabel:     { fontSize: 11, color: '#9ca3af' },
+  todayDayBox:       { marginTop: 12, backgroundColor: '#f9fafb', borderRadius: 10, padding: 12 },
+  todayDayRow:       { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  todayDot:          { width: 8, height: 8, borderRadius: 4 },
+  todayDayName:      { fontSize: 13, fontWeight: '700', color: '#111827' },
+  todayDayEx:        { fontSize: 11, color: '#9ca3af', marginTop: 2 },
+  todayDayStatusTxt: { fontSize: 12, fontWeight: '700' },
+  todayRestText:     { fontSize: 13, color: '#9ca3af', textAlign: 'center', paddingVertical: 4 },
+  todayEmpty:        { alignItems: 'center', paddingVertical: 20 },
+  todayEmptyText:    { fontSize: 14, fontWeight: '700', color: '#374151' },
+  todayEmptySub:     { fontSize: 12, color: '#9ca3af', marginTop: 4, textAlign: 'center', lineHeight: 18 },
+  levelSectionTitle: { fontSize: 11, fontWeight: '700', color: '#6b7280', textTransform: 'uppercase', letterSpacing: 0.8, marginTop: 2 },
   levelCard: { borderRadius: 16, borderWidth: 2, padding: 16, flexDirection: 'row', gap: 12, alignItems: 'center' },
   levelIconWrap: { width: 48, height: 48, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   levelLabel: { fontSize: 16, fontWeight: '700', color: '#111827' },
