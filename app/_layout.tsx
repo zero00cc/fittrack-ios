@@ -56,11 +56,12 @@ export default function RootLayout() {
         <Stack.Screen
           name="calorie-settings"
           options={{
-            title:            'Profile & Settings',
-            headerStyle:      { backgroundColor: '#FCFBEA' },
-            headerTintColor:  '#37260C',
-            headerTitleStyle: { fontWeight: '700' },
-            headerBackTitle:  '',
+            title:                 'Profile & Settings',
+            headerStyle:           { backgroundColor: '#FCFBEA' },
+            headerTintColor:       '#37260C',
+            headerTitleStyle:      { fontWeight: '700' },
+            headerBackTitle:       '',
+            headerBackTitleVisible: false,
           }}
         />
         <Stack.Screen
@@ -73,21 +74,23 @@ export default function RootLayout() {
         <Stack.Screen
           name="calorie-result"
           options={{
-            presentation:   'modal',
-            title:          'Meal Details',
-            headerStyle:    { backgroundColor: '#FCFBEA' },
-            headerTintColor: '#37260C',
-            headerTitleStyle: { fontWeight: '700' },
+            presentation:          'modal',
+            title:                 'Meal Details',
+            headerStyle:           { backgroundColor: '#FCFBEA' },
+            headerTintColor:       '#37260C',
+            headerTitleStyle:      { fontWeight: '700' },
+            headerBackTitleVisible: false,
           }}
         />
         <Stack.Screen
           name="calorie-progress"
           options={{
-            title:            'Progress & History',
-            headerStyle:      { backgroundColor: '#FCFBEA' },
-            headerTintColor:  '#37260C',
-            headerTitleStyle: { fontWeight: '700' },
-            headerBackTitle:  '',
+            title:                 'Progress & History',
+            headerStyle:           { backgroundColor: '#FCFBEA' },
+            headerTintColor:       '#37260C',
+            headerTitleStyle:      { fontWeight: '700' },
+            headerBackTitle:       '',
+            headerBackTitleVisible: false,
           }}
         />
       </Stack>
