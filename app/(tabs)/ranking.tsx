@@ -296,14 +296,17 @@ export default function RankingScreen() {
               const isMe = entry.userId === myProfile?.userId;
               return (
                 <View key={entry.userId} style={[styles.tableRow, isMe && styles.tableRowMe, i % 2 === 1 && styles.tableRowAlt]}>
-                  <Text style={[
-                    styles.tableCell, styles.rankCell, styles.rankText,
-                    i === 0 && { color: '#f59e0b' },
-                    i === 1 && { color: '#94a3b8' },
-                    i === 2 && { color: '#b45309' },
-                  ]}>
-                    {i + 1}
-                  </Text>
+                  <View style={styles.rankCell}>
+                    {i < 3 ? (
+                      <Ionicons
+                        name="ribbon"
+                        size={18}
+                        color={i === 0 ? '#f59e0b' : i === 1 ? '#94a3b8' : '#b45309'}
+                      />
+                    ) : (
+                      <Text style={styles.rankText}>{i + 1}</Text>
+                    )}
+                  </View>
                   <Text style={[styles.tableCell, styles.nameCell, styles.nameText]} numberOfLines={1}>
                     {entry.displayName}{isMe ? ' (you)' : ''}
                   </Text>
@@ -386,7 +389,7 @@ const styles = StyleSheet.create({
   tableRowAlt:     { backgroundColor: '#fafafa' },
   tableRowMe:      { backgroundColor: '#ecfdf5' },
   tableCell:       { fontSize: 13, color: '#374151', textAlignVertical: 'center' },
-  rankCell:        { width: 32 },
+  rankCell:        { width: 32, alignItems: 'center', justifyContent: 'center' },
   nameCell:        { flex: 1, paddingRight: 8 },
   liftCell:        { width: 42, textAlign: 'right' },
   totalCell:       { width: 48, textAlign: 'right' },
