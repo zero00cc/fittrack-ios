@@ -85,10 +85,19 @@ export interface CompletedPlan {
   dayResults: CompletedPlanDay[];
 }
 
+export interface PersonalRecord {
+  id:       string;
+  date:     string;         // YYYY-MM-DD
+  squat:    number | null;  // kg
+  bench:    number | null;  // kg
+  deadlift: number | null;  // kg
+}
+
 export interface WorkoutState {
   selectedLevel:     TrainingLevel | null;
   activePlanId:      string | null;
   progress:          PlanProgress | null;
   planHistory:       CompletedPlan[];
   personalizedPlans: WorkoutPlan[];
+  prLog?:            PersonalRecord[];
 }

@@ -24,6 +24,10 @@ import {
 import { isoToDisplay, todayYMD } from '../../utils/dateUtils';
 import { generateId } from '../../utils/calorieUtils';
 
+const SQUAT_C = '#ef4444';
+const BENCH_C = '#3b82f6';
+const DL_C    = '#a855f7';
+
 type DailyDateConfirm =
   | { type: 'add';    dateYMD: string; nextDay: WorkoutDay }
   | { type: 'remove'; dateYMD: string; dayNumber: number; dayLabel: string };
@@ -76,6 +80,7 @@ export default function WorkoutsScreen() {
     resetDayProgress,
     resetPlan,
     recordCompletedPlan,
+    recordPR,
     savePersonalizedPlan,
     deletePersonalizedPlan,
   } = useWorkoutStore();
@@ -103,6 +108,13 @@ export default function WorkoutsScreen() {
   const [showEditPicker,    setShowEditPicker]    = useState(false);
   const [editPickerSearch,  setEditPickerSearch]  = useState('');
   const [confirmDeleteId,   setConfirmDeleteId]   = useState<string | null>(null);
+  // PR input modal (shown after mode/schedule selection, before plan activation)
+  const [showPRInput,      setShowPRInput]      = useState(false);
+  const [pendingMode,      setPendingMode]      = useState<PlanMode | null>(null);
+  const [pendingDateMap,   setPendingDateMap]   = useState<{ [d: string]: number } | undefined>(undefined);
+  const [prSquat,          setPrSquat]          = useState('');
+  const [prBench,          setPrBench]          = useState('');
+  const [prDeadlift,       setPrDeadlift]       = useState('');
 
   // These must stay above any early return to satisfy Rules of Hooks
   const dayExerciseIds = useMemo(() => {
@@ -220,20 +232,43 @@ export default function WorkoutsScreen() {
 
   function handleModeSelect(mode: PlanMode) {
     if (!pendingPlanId) return;
-    const plan = workoutPlans.find((p) => p.id === pendingPlanId);
+    const plan = workoutPlans.find((p) => p.id === pendingPlanId)
+      ?? (workoutState.personalizedPlans ?? []).find((p) => p.id === pendingPlanId);
     if (!plan) return;
 
     setShowModePicker(false);
 
     if (mode === 'scheduled') {
-      // Go to the manual scheduling screen (pendingPlanId stays set)
       setView('setup');
       return;
     }
 
-    // daily: activate immediately with no pre-assigned dates
-    activatePlan(pendingPlanId, plan.defaultWeeklySchedule, 'daily', undefined);
+    // daily: show PR input before activating
+    setPendingMode('daily');
+    setPendingDateMap(undefined);
+    setPrSquat(''); setPrBench(''); setPrDeadlift('');
+    setShowPRInput(true);
+  }
+
+  function doActivatePlanWithPR() {
+    if (!pendingPlanId || !pendingMode) return;
+    const plan = workoutPlans.find((p) => p.id === pendingPlanId)
+      ?? (workoutState.personalizedPlans ?? []).find((p) => p.id === pendingPlanId);
+    if (!plan) return;
+
+    const sq = parseFloat(prSquat)    || null;
+    const bp = parseFloat(prBench)    || null;
+    const dl = parseFloat(prDeadlift) || null;
+    if (sq !== null || bp !== null || dl !== null) {
+      recordPR({ id: generateId(), date: todayYMD(), squat: sq, bench: bp, deadlift: dl });
+    }
+
+    activatePlan(pendingPlanId, plan.defaultWeeklySchedule, pendingMode, pendingDateMap);
     setPendingPlanId(null);
+    setPendingMode(null);
+    setPendingDateMap(undefined);
+    setPrSquat(''); setPrBench(''); setPrDeadlift('');
+    setShowPRInput(false);
     setView('detail');
   }
 
@@ -588,14 +623,16 @@ export default function WorkoutsScreen() {
           ))}
 
           {(workoutState.planHistory ?? []).length > 0 && (
-            <View style={styles.historyBox}>
-              <Text style={styles.historyBoxTitle}>Completed Plans</Text>
+            <TouchableOpacity
+              style={styles.historyBox}
+              onPress={() => router.push('/workout-history' as any)}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.historyBoxTitle}>Completed Plans & PRs →</Text>
               {workoutState.planHistory.map((record) => (
-                <TouchableOpacity
+                <View
                   key={record.id}
                   style={styles.historyBoxRow}
-                  onPress={() => setView('history')}
-                  activeOpacity={0.7}
                 >
                   <View style={{ flex: 1 }}>
                     <Text style={styles.historyBoxPlanName}>{record.planName}</Text>
@@ -609,9 +646,9 @@ export default function WorkoutsScreen() {
                     </Text>
                     <Text style={styles.historyBoxBadgeLabel}>done</Text>
                   </View>
-                </TouchableOpacity>
+                </View>
               ))}
-            </View>
+            </TouchableOpacity>
           )}
         </ScrollView>
       </SafeAreaView>
@@ -668,9 +705,10 @@ export default function WorkoutsScreen() {
       <ScheduleSetup
         plan={plan}
         onConfirm={(dateMap) => {
-          activatePlan(pendingPlanId!, plan.defaultWeeklySchedule, 'scheduled', dateMap);
-          setPendingPlanId(null);
-          setView('detail');
+          setPendingMode('scheduled');
+          setPendingDateMap(dateMap);
+          setPrSquat(''); setPrBench(''); setPrDeadlift('');
+          setShowPRInput(true);
         }}
         onCancel={() => {
           setPendingPlanId(null);
@@ -680,56 +718,11 @@ export default function WorkoutsScreen() {
     );
   }
 
-  // ── Plan history ───────────────────────────────────────────────
+  // ── Plan history — redirect to dedicated screen ────────────────
   if (view === 'history') {
-    const history = workoutState.planHistory ?? [];
-    return (
-      <SafeAreaView style={styles.safe} edges={['bottom']}>
-        <ScrollView contentContainerStyle={styles.scroll}>
-          <TouchableOpacity onPress={() => setView('level')} style={styles.backBtn}>
-            <Text style={styles.backBtnText}>← Back</Text>
-          </TouchableOpacity>
-          <Text style={styles.pageTitle}>Completed Plans</Text>
-          {history.length === 0 ? (
-            <View style={styles.emptyCard}>
-              <Text style={styles.emptyDesc}>No completed plans yet.</Text>
-            </View>
-          ) : (
-            history.map((record) => (
-              <View key={record.id} style={styles.historyCard}>
-                <View style={styles.historyCardHeader}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.historyPlanName}>{record.planName}</Text>
-                    <Text style={styles.historyDates}>
-                      {isoToDisplay(record.startDate)} → {isoToDisplay(record.completedDate)}
-                    </Text>
-                  </View>
-                  <View style={styles.historyBadge}>
-                    <Text style={styles.historyBadgeText}>
-                      {record.finishedDays}/{record.totalDays}
-                    </Text>
-                    <Text style={styles.historyBadgeLabel}>done</Text>
-                  </View>
-                </View>
-                <View style={styles.historyDayList}>
-                  {record.dayResults.map((dr) => (
-                    <View key={dr.dayNumber} style={styles.historyDayRow}>
-                      <Text style={[styles.historyDayStatus, { color: STATUS_COLORS[dr.status] }]}>
-                        {STATUS_LABELS[dr.status]}
-                      </Text>
-                      <Text style={styles.historyDayLabel} numberOfLines={1}>{dr.label}</Text>
-                      {dr.completionDate && (
-                        <Text style={styles.historyDayDate}>{isoToDisplay(dr.completionDate)}</Text>
-                      )}
-                    </View>
-                  ))}
-                </View>
-              </View>
-            ))
-          )}
-        </ScrollView>
-      </SafeAreaView>
-    );
+    router.push('/workout-history' as any);
+    setView('level');
+    return null;
   }
 
   // ── Active plan detail ──────────────────────────────────────────
@@ -797,8 +790,8 @@ export default function WorkoutsScreen() {
             })}
 
             {(workoutState.planHistory ?? []).length > 0 && (
-              <TouchableOpacity style={styles.historyLink} onPress={() => setView('history')}>
-                <Text style={styles.historyLinkText}>View Completed Plans ({workoutState.planHistory.length})</Text>
+              <TouchableOpacity style={styles.historyLink} onPress={() => router.push('/workout-history' as any)}>
+                <Text style={styles.historyLinkText}>View Completed Plans & PRs ({workoutState.planHistory.length})</Text>
               </TouchableOpacity>
             )}
           </>
@@ -957,6 +950,55 @@ export default function WorkoutsScreen() {
       )}
 
       {/* ── Daily date confirm modal ─────────────────────────────── */}
+      {/* ── PR input modal (shown before activating a plan) ─────── */}
+      {showPRInput && (
+        <Modal visible transparent animationType="slide">
+          <View style={styles.prOverlay}>
+            <View style={styles.prCard}>
+              <Text style={styles.prTitle}>Log Your Current PRs</Text>
+              <Text style={styles.prSubtitle}>
+                Record your 1-rep max before starting. All fields are optional.
+              </Text>
+
+              {([
+                { label: 'Squat',       color: SQUAT_C, val: prSquat,    set: setPrSquat    },
+                { label: 'Bench Press', color: BENCH_C, val: prBench,    set: setPrBench    },
+                { label: 'Deadlift',    color: DL_C,    val: prDeadlift, set: setPrDeadlift },
+              ] as const).map(({ label, color, val, set }) => (
+                <View key={label} style={styles.prField}>
+                  <View style={[styles.prFieldBar, { backgroundColor: color }]} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.prFieldLabel}>{label}</Text>
+                    <View style={styles.prInputRow}>
+                      <TextInput
+                        style={styles.prInput}
+                        value={val}
+                        onChangeText={set as (v: string) => void}
+                        keyboardType="decimal-pad"
+                        placeholder="—"
+                        placeholderTextColor="#9ca3af"
+                        selectTextOnFocus
+                      />
+                      <Text style={styles.prUnit}>kg</Text>
+                    </View>
+                  </View>
+                </View>
+              ))}
+
+              <TouchableOpacity style={styles.prStartBtn} onPress={doActivatePlanWithPR}>
+                <Text style={styles.prStartText}>Save & Start Plan</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.prSkipBtn}
+                onPress={() => { setPrSquat(''); setPrBench(''); setPrDeadlift(''); doActivatePlanWithPR(); }}
+              >
+                <Text style={styles.prSkipText}>Skip — start without logging</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+      )}
+
       {/* ── Plan complete celebration modal ──────────────────────── */}
       {completedRecord && (
         <Modal visible transparent animationType="fade">
@@ -1239,6 +1281,21 @@ const styles = StyleSheet.create({
   createCancelText:{ color: '#6b7280', fontSize: 14, fontWeight: '600' },
   createConfirmBtn:{ flex: 1, backgroundColor: '#10b981', borderRadius: 12, paddingVertical: 12, alignItems: 'center' },
   createConfirmText:{ color: '#fff', fontSize: 14, fontWeight: '700' },
+  // PR input modal
+  prOverlay:    { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' },
+  prCard:       { backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, gap: 14, paddingBottom: 36 },
+  prTitle:      { fontSize: 19, fontWeight: '800', color: '#111827', textAlign: 'center' },
+  prSubtitle:   { fontSize: 13, color: '#6b7280', textAlign: 'center', lineHeight: 18, marginTop: -4 },
+  prField:      { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#f9fafb', borderRadius: 12, padding: 12 },
+  prFieldBar:   { width: 4, height: 40, borderRadius: 2 },
+  prFieldLabel: { fontSize: 11, fontWeight: '700', color: '#6b7280', textTransform: 'uppercase', letterSpacing: 0.5 },
+  prInputRow:   { flexDirection: 'row', alignItems: 'baseline', gap: 6, marginTop: 4 },
+  prInput:      { fontSize: 24, fontWeight: '800', color: '#111827', width: 90 },
+  prUnit:       { fontSize: 13, color: '#9ca3af', fontWeight: '600' },
+  prStartBtn:   { backgroundColor: '#10b981', borderRadius: 14, paddingVertical: 14, alignItems: 'center', marginTop: 4 },
+  prStartText:  { color: '#fff', fontWeight: '700', fontSize: 15 },
+  prSkipBtn:    { paddingVertical: 10, alignItems: 'center' },
+  prSkipText:   { color: '#9ca3af', fontSize: 13 },
   // Plan editor
   editPlanSubtitle:{ fontSize: 13, color: '#6b7280', marginBottom: 4 },
   editDayCard:     { backgroundColor: '#fff', borderRadius: 12, padding: 14, flexDirection: 'row', alignItems: 'center', shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 4, shadowOffset: { width: 0, height: 1 } },

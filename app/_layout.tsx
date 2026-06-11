@@ -93,6 +93,17 @@ export default function RootLayout() {
             headerBackTitleVisible: false,
           }}
         />
+        <Stack.Screen
+          name="workout-history"
+          options={{
+            title:                 'Workout History',
+            headerStyle:           { backgroundColor: '#FCFBEA' },
+            headerTintColor:       '#37260C',
+            headerTitleStyle:      { fontWeight: '700' },
+            headerBackTitle:       '',
+            headerBackTitleVisible: false,
+          }}
+        />
       </Stack>
     </AuthProvider>
   );

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { useAsyncStorage } from './useAsyncStorage';
-import { WorkoutState, TrainingLevel, DayStatus, SetBlock, Exercise, PlanMode, CompletedPlan } from '../types/workout.types';
+import { WorkoutState, TrainingLevel, DayStatus, SetBlock, Exercise, PlanMode, CompletedPlan, PersonalRecord } from '../types/workout.types';
 import { todayYMD } from '../utils/dateUtils';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
@@ -234,6 +234,15 @@ export function useWorkoutStore() {
     [setWorkoutState],
   );
 
+  const recordPR = useCallback(
+    (pr: PersonalRecord) =>
+      setWorkoutState((prev) => ({
+        ...prev,
+        prLog: [pr, ...(prev.prLog ?? [])],
+      })),
+    [setWorkoutState],
+  );
+
   return {
     workoutState,
     loaded,
@@ -247,6 +256,7 @@ export function useWorkoutStore() {
     resetDayProgress,
     resetPlan,
     recordCompletedPlan,
+    recordPR,
     savePersonalizedPlan,
     deletePersonalizedPlan,
   };
