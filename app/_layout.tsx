@@ -56,10 +56,11 @@ export default function RootLayout() {
         <Stack.Screen
           name="calorie-settings"
           options={{
-            title:           'Profile & Settings',
-            headerStyle:     { backgroundColor: '#FCFBEA' },
-            headerTintColor: '#37260C',
+            title:            'Profile & Settings',
+            headerStyle:      { backgroundColor: '#FCFBEA' },
+            headerTintColor:  '#37260C',
             headerTitleStyle: { fontWeight: '700' },
+            headerBackTitle:  '',
           }}
         />
         <Stack.Screen
@@ -82,10 +83,11 @@ export default function RootLayout() {
         <Stack.Screen
           name="calorie-progress"
           options={{
-            title:          'Progress & History',
-            headerStyle:    { backgroundColor: '#FCFBEA' },
-            headerTintColor: '#37260C',
+            title:            'Progress & History',
+            headerStyle:      { backgroundColor: '#FCFBEA' },
+            headerTintColor:  '#37260C',
             headerTitleStyle: { fontWeight: '700' },
+            headerBackTitle:  '',
           }}
         />
       </Stack>

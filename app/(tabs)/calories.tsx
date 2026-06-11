@@ -578,7 +578,7 @@ export default function CaloriesScreen() {
               <Text style={s.aiReportTxt}>AI Report</Text>
             </TouchableOpacity>
             <TouchableOpacity onPress={() => router.push('/calorie-settings')} style={s.settingsBtn}>
-              <Text style={s.settingsIcon}>⚙</Text>
+              <Ionicons name="settings-outline" size={18} color={MUTED} />
             </TouchableOpacity>
           </View>
         </View>
@@ -699,7 +699,6 @@ const s = StyleSheet.create({
   aiReportBtn:  { backgroundColor: CARD, borderRadius: 9, paddingHorizontal: 12, paddingVertical: 10, borderWidth: 1, borderColor: BORDER },
   aiReportTxt:  { fontSize: 12, fontWeight: '700', color: ACCENT },
   settingsBtn:  { backgroundColor: CARD, borderRadius: 9, padding: 10, borderWidth: 1, borderColor: BORDER },
-  settingsIcon: { fontSize: 18, color: MUTED },
 
   backToday:    { alignSelf: 'center' },
   backTodayTxt: { color: ACCENT, fontSize: 13, fontWeight: '600' },
