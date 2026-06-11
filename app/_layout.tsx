@@ -50,7 +50,7 @@ export default function RootLayout() {
     <AuthProvider>
       <AuthGate />
       <Stack>
-        <Stack.Screen name="(tabs)"            options={{ headerShown: false }} />
+        <Stack.Screen name="(tabs)"            options={{ headerShown: false, title: '' }} />
         <Stack.Screen name="(auth)"            options={{ headerShown: false }} />
         <Stack.Screen name="modal"             options={{ presentation: 'modal' }} />
         <Stack.Screen
