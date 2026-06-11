@@ -18,7 +18,6 @@ const features: Array<{
   { route: '/calories',  iconName: 'nutrition', iconColor: '#059669', label: 'Calorie Tracker',  desc: 'Log meals and track daily intake.',        color: '#d1fae5', border: '#6ee7b7' },
   { route: '/workouts',  iconName: 'barbell',   iconColor: '#2563eb', label: 'Workout Plans',    desc: 'Follow structured training plans.',        color: '#dbeafe', border: '#93c5fd' },
   { route: '/exercises', iconName: 'body',      iconColor: '#7c3aed', label: 'Exercise Library', desc: 'Video demos and step-by-step guidance.',   color: '#ede9fe', border: '#c4b5fd' },
-  { route: '/gallery',   iconName: 'images',    iconColor: '#ea580c', label: 'Gallery',          desc: 'Photos of your meals and workouts.',       color: '#ffedd5', border: '#fdba74' },
 ];
 
 export default function HomeScreen() {
