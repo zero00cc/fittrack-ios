@@ -1,9 +1,10 @@
 import { useMemo, useRef, useEffect, useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Modal, TextInput, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useWorkoutStore } from '../hooks/useWorkoutStore';
 import { PersonalRecord } from '../types/workout.types';
-import { isoToDisplay, todayYMD, getLast90Days } from '../utils/dateUtils';
+import { isoToDisplay, todayYMD, getLast90Days, getLast30Days, formatShortDate } from '../utils/dateUtils';
+import { generateId } from '../utils/calorieUtils';
 import {
   BG, CARD, BORDER, TEXT, MUTED, DIM, ACCENT, ACCENT_MID, SERIF,
 } from '../constants/theme';
@@ -289,9 +290,56 @@ const STATUS_LABELS = { finished: '✓ Done', skipped: '– Skipped', unfinished
 const LEVEL_LABELS  = { beginner: 'Beginner', intermediate: 'Intermediate', professional: 'Professional', personalized: 'Custom' };
 
 export default function WorkoutHistoryScreen() {
-  const { workoutState } = useWorkoutStore();
+  const { workoutState, recordPR, updatePR, deletePR } = useWorkoutStore();
 
   const prLog = workoutState.prLog ?? [];
+
+  // ── PR edit modal state ──────────────────────────────────────────
+  const [editingPR,  setEditingPR]  = useState<PersonalRecord | null>(null);
+  const [isNewPR,    setIsNewPR]    = useState(false);
+  const [editDate,   setEditDate]   = useState(todayYMD());
+  const [editSquat,  setEditSquat]  = useState('');
+  const [editBench,  setEditBench]  = useState('');
+  const [editDL,     setEditDL]     = useState('');
+
+  function openEdit(pr: PersonalRecord) {
+    setEditingPR(pr);
+    setIsNewPR(false);
+    setEditDate(pr.date);
+    setEditSquat(pr.squat    != null ? String(pr.squat)    : '');
+    setEditBench(pr.bench    != null ? String(pr.bench)    : '');
+    setEditDL   (pr.deadlift != null ? String(pr.deadlift) : '');
+  }
+
+  function openNew() {
+    const blank: PersonalRecord = { id: generateId(), date: todayYMD(), squat: null, bench: null, deadlift: null };
+    setEditingPR(blank);
+    setIsNewPR(true);
+    setEditDate(todayYMD());
+    setEditSquat(''); setEditBench(''); setEditDL('');
+  }
+
+  function closeEdit() { setEditingPR(null); }
+
+  function saveEdit() {
+    if (!editingPR) return;
+    const updated: PersonalRecord = {
+      ...editingPR,
+      date:     editDate,
+      squat:    parseFloat(editSquat)  || null,
+      bench:    parseFloat(editBench)  || null,
+      deadlift: parseFloat(editDL)     || null,
+    };
+    if (isNewPR) recordPR(updated);
+    else         updatePR(updated);
+    closeEdit();
+  }
+
+  function confirmDelete() {
+    if (!editingPR) return;
+    deletePR(editingPR.id);
+    closeEdit();
+  }
 
   // Build activity date map from all plan history + current progress
   const workoutDates = useMemo<Record<string, 'done' | 'skipped'>>(() => {
@@ -330,22 +378,110 @@ export default function WorkoutHistoryScreen() {
         <PRChart prLog={prLog} />
 
         {/* PR Log */}
-        {prLog.length > 0 && (
-          <>
-            <Text style={s.sectionHeader}>PR Log</Text>
-            <View style={s.prLogCard}>
-              {prLog.map((pr, idx) => (
-                <View key={pr.id} style={[s.prRow, idx < prLog.length - 1 && s.prRowBorder]}>
-                  <Text style={s.prDate}>{isoToDisplay(pr.date)}</Text>
-                  <View style={s.prValues}>
-                    {pr.squat    !== null && <Text style={[s.prVal, { color: SQUAT_C }]}>SQ {pr.squat}kg</Text>}
-                    {pr.bench    !== null && <Text style={[s.prVal, { color: BENCH_C }]}>BP {pr.bench}kg</Text>}
-                    {pr.deadlift !== null && <Text style={[s.prVal, { color: DL_C    }]}>DL {pr.deadlift}kg</Text>}
-                  </View>
+        <View style={s.prLogHeader}>
+          <Text style={s.sectionHeader}>PR Log</Text>
+          <TouchableOpacity style={s.addPRBtn} onPress={openNew}>
+            <Text style={s.addPRText}>+ Log PR</Text>
+          </TouchableOpacity>
+        </View>
+        {prLog.length === 0 ? (
+          <TouchableOpacity style={s.emptyCard} onPress={openNew} activeOpacity={0.7}>
+            <Text style={s.emptyText}>No PRs logged yet</Text>
+            <Text style={[s.emptyText, { fontSize: 11, marginTop: 3 }]}>Tap to add your first entry</Text>
+          </TouchableOpacity>
+        ) : (
+          <View style={s.prLogCard}>
+            {prLog.map((pr, idx) => (
+              <TouchableOpacity
+                key={pr.id}
+                style={[s.prRow, idx < prLog.length - 1 && s.prRowBorder]}
+                onPress={() => openEdit(pr)}
+                activeOpacity={0.7}
+              >
+                <Text style={s.prDate}>{isoToDisplay(pr.date)}</Text>
+                <View style={s.prValues}>
+                  {pr.squat    !== null && <Text style={[s.prVal, { color: SQUAT_C }]}>SQ {pr.squat}kg</Text>}
+                  {pr.bench    !== null && <Text style={[s.prVal, { color: BENCH_C }]}>BP {pr.bench}kg</Text>}
+                  {pr.deadlift !== null && <Text style={[s.prVal, { color: DL_C    }]}>DL {pr.deadlift}kg</Text>}
                 </View>
-              ))}
-            </View>
-          </>
+                <Text style={s.prChevron}>›</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
+
+        {/* PR Edit Modal */}
+        {editingPR && (
+          <Modal visible transparent animationType="slide">
+            <SafeAreaView style={s.modalSafe} edges={['bottom']}>
+              <View style={s.modalOverlay}>
+                <View style={s.modalCard}>
+                  <View style={s.modalTopRow}>
+                    <Text style={s.modalTitle}>{isNewPR ? 'Log New PR' : 'Edit PR'}</Text>
+                    <TouchableOpacity onPress={closeEdit}>
+                      <Text style={s.modalClose}>✕</Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* Date picker */}
+                  <Text style={s.modalLabel}>Date</Text>
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={s.datePicker}
+                  >
+                    {getLast30Days().reverse().map((d) => (
+                      <TouchableOpacity
+                        key={d}
+                        style={[s.datePill, editDate === d && s.datePillOn]}
+                        onPress={() => setEditDate(d)}
+                      >
+                        <Text style={[s.datePillTxt, editDate === d && s.datePillTxtOn]}>
+                          {formatShortDate(d)}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+
+                  {/* Lift inputs */}
+                  {([
+                    { label: 'Squat',       color: SQUAT_C, val: editSquat, set: setEditSquat },
+                    { label: 'Bench Press', color: BENCH_C, val: editBench, set: setEditBench },
+                    { label: 'Deadlift',    color: DL_C,    val: editDL,    set: setEditDL    },
+                  ] as const).map(({ label, color, val, set }) => (
+                    <View key={label} style={s.liftRow}>
+                      <View style={[s.liftBar, { backgroundColor: color }]} />
+                      <View style={{ flex: 1 }}>
+                        <Text style={s.liftLabel}>{label}</Text>
+                        <View style={s.liftInputRow}>
+                          <TextInput
+                            style={[s.liftInput, { color }]}
+                            value={val}
+                            onChangeText={set as (v: string) => void}
+                            keyboardType="decimal-pad"
+                            placeholder="—"
+                            placeholderTextColor={MUTED}
+                            selectTextOnFocus
+                          />
+                          <Text style={s.liftUnit}>kg</Text>
+                        </View>
+                      </View>
+                    </View>
+                  ))}
+
+                  {/* Actions */}
+                  <TouchableOpacity style={s.saveBtn} onPress={saveEdit}>
+                    <Text style={s.saveBtnTxt}>Save</Text>
+                  </TouchableOpacity>
+                  {!isNewPR && (
+                    <TouchableOpacity style={s.deleteBtn} onPress={confirmDelete}>
+                      <Text style={s.deleteBtnTxt}>Delete Entry</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </View>
+            </SafeAreaView>
+          </Modal>
         )}
 
         {/* Completed Plans */}
@@ -405,12 +541,39 @@ const s = StyleSheet.create({
   sectionHeader: { fontSize: 10, fontWeight: '700', color: ACCENT, textTransform: 'uppercase', letterSpacing: 0.9, marginTop: 6 },
 
   // PR log
+  prLogHeader:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  addPRBtn:      { backgroundColor: CARD, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 5, borderWidth: 1, borderColor: BORDER },
+  addPRText:     { fontSize: 12, fontWeight: '700', color: ACCENT },
   prLogCard:     { backgroundColor: CARD, borderRadius: 14, overflow: 'hidden', borderWidth: 1, borderColor: BORDER },
-  prRow:         { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, paddingHorizontal: 14 },
+  prRow:         { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 14 },
   prRowBorder:   { borderBottomWidth: 1, borderBottomColor: BORDER },
   prDate:        { fontSize: 12, fontWeight: '600', color: TEXT, flex: 1 },
   prValues:      { flexDirection: 'row', gap: 8 },
   prVal:         { fontSize: 11, fontWeight: '700' },
+  prChevron:     { fontSize: 18, color: MUTED, marginLeft: 6 },
+  // PR edit modal
+  modalSafe:     { flex: 1 },
+  modalOverlay:  { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  modalCard:     { backgroundColor: BG, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, gap: 12, paddingBottom: 28 },
+  modalTopRow:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  modalTitle:    { fontSize: 17, fontWeight: '800', color: TEXT, fontFamily: SERIF },
+  modalClose:    { fontSize: 18, color: MUTED, paddingLeft: 16 },
+  modalLabel:    { fontSize: 10, fontWeight: '700', color: ACCENT, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: -4 },
+  datePicker:    { gap: 6, paddingVertical: 2 },
+  datePill:      { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER },
+  datePillOn:    { backgroundColor: TEXT, borderColor: TEXT },
+  datePillTxt:   { fontSize: 12, fontWeight: '600', color: MUTED },
+  datePillTxtOn: { color: BG },
+  liftRow:       { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: CARD, borderRadius: 12, padding: 12 },
+  liftBar:       { width: 4, height: 44, borderRadius: 2 },
+  liftLabel:     { fontSize: 10, fontWeight: '700', color: MUTED, textTransform: 'uppercase', letterSpacing: 0.5 },
+  liftInputRow:  { flexDirection: 'row', alignItems: 'baseline', gap: 4, marginTop: 2 },
+  liftInput:     { fontSize: 26, fontWeight: '800', width: 100, fontFamily: SERIF },
+  liftUnit:      { fontSize: 13, color: MUTED, fontWeight: '600' },
+  saveBtn:       { backgroundColor: ACCENT, borderRadius: 12, paddingVertical: 13, alignItems: 'center' },
+  saveBtnTxt:    { color: BG, fontWeight: '700', fontSize: 15 },
+  deleteBtn:     { paddingVertical: 10, alignItems: 'center' },
+  deleteBtnTxt:  { color: '#ef4444', fontSize: 13, fontWeight: '600' },
 
   // Completed plan cards
   planCard:       { backgroundColor: CARD, borderRadius: 14, padding: 14, borderWidth: 1, borderColor: BORDER, gap: 10 },

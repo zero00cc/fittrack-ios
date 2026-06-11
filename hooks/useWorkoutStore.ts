@@ -243,6 +243,24 @@ export function useWorkoutStore() {
     [setWorkoutState],
   );
 
+  const updatePR = useCallback(
+    (pr: PersonalRecord) =>
+      setWorkoutState((prev) => ({
+        ...prev,
+        prLog: (prev.prLog ?? []).map((p) => (p.id === pr.id ? pr : p)),
+      })),
+    [setWorkoutState],
+  );
+
+  const deletePR = useCallback(
+    (prId: string) =>
+      setWorkoutState((prev) => ({
+        ...prev,
+        prLog: (prev.prLog ?? []).filter((p) => p.id !== prId),
+      })),
+    [setWorkoutState],
+  );
+
   return {
     workoutState,
     loaded,
@@ -257,6 +275,8 @@ export function useWorkoutStore() {
     resetPlan,
     recordCompletedPlan,
     recordPR,
+    updatePR,
+    deletePR,
     savePersonalizedPlan,
     deletePersonalizedPlan,
   };
