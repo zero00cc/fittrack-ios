@@ -80,7 +80,7 @@ export function useWorkoutStore() {
 
   const setLevel = useCallback(
     (level: TrainingLevel) =>
-      setWorkoutState((prev) => ({ ...prev, selectedLevel: level, activePlanId: null, progress: null })),
+      setWorkoutState((prev) => ({ ...prev, selectedLevel: level })),
     [setWorkoutState],
   );
 
