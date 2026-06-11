@@ -1,8 +1,15 @@
 import { useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Modal, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { WorkoutPlan } from '../../types/workout.types';
+import { WorkoutPlan, WorkoutDay, SetBlock } from '../../types/workout.types';
 import { todayYMD } from '../../utils/dateUtils';
+
+function fmtBlock(b: SetBlock): string {
+  const reps = b.reps != null ? `×${b.reps}` : ' sets';
+  const rpe  = b.rpe  != null ? ` @${b.rpe}` : '';
+  const load = b.load != null ? ` (${b.load} kg)` : '';
+  return `${b.sets}${reps}${rpe}${load}`;
+}
 
 const DOW = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
 const MONTHS = [
@@ -34,6 +41,8 @@ export function ScheduleSetup({ plan, onConfirm, onCancel }: Props) {
   const [dateMap, setDateMap] = useState<{ [date: string]: number }>({});
   // which planDayNumber is currently being assigned
   const [activeDayNum, setActiveDayNum] = useState<number>(trainingDayNumbers[0]);
+  // day whose exercises are being previewed
+  const [previewDay, setPreviewDay] = useState<WorkoutDay | null>(null);
 
   // reverse: planDayNumber → date
   const assigned: { [dn: number]: string } = {};
@@ -210,11 +219,50 @@ export function ScheduleSetup({ plan, onConfirm, onCancel }: Props) {
                   }
                 </View>
                 {isActive && <Text style={styles.activeArrow}>→</Text>}
+                <TouchableOpacity
+                  onPress={() => setPreviewDay(day)}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <Text style={styles.infoBtn}>ⓘ</Text>
+                </TouchableOpacity>
               </TouchableOpacity>
             );
           })}
         </ScrollView>
       </ScrollView>
+
+      {/* ── Day exercise preview modal ── */}
+      {previewDay && (
+        <Modal visible animationType="slide" presentationStyle="pageSheet">
+          <SafeAreaView style={styles.previewSafe} edges={['bottom']}>
+            <View style={styles.previewHeader}>
+              <TouchableOpacity onPress={() => setPreviewDay(null)}>
+                <Text style={styles.previewClose}>Close</Text>
+              </TouchableOpacity>
+              <Text style={styles.previewTitle} numberOfLines={2}>{previewDay.label}</Text>
+              <View style={{ width: 48 }} />
+            </View>
+            <ScrollView contentContainerStyle={styles.previewScroll}>
+              {previewDay.exercises.map((ex) => (
+                <View key={ex.id} style={styles.previewExCard}>
+                  <Text style={styles.previewExName}>
+                    {ex.label ? `${ex.label}. ` : ''}{ex.name}
+                  </Text>
+                  {(ex.setBlocks ?? []).map((b, i) => (
+                    <Text key={i} style={styles.previewBlock}>{fmtBlock(b)}</Text>
+                  ))}
+                  {!ex.setBlocks?.length && ex.sets != null && (
+                    <Text style={styles.previewBlock}>{ex.sets} × {ex.reps ?? 'max'}</Text>
+                  )}
+                </View>
+              ))}
+              {previewDay.exercises.length === 0 && (
+                <Text style={styles.previewEmpty}>No exercises listed.</Text>
+              )}
+            </ScrollView>
+          </SafeAreaView>
+        </Modal>
+      )}
     </SafeAreaView>
   );
 }
@@ -296,4 +344,23 @@ const styles = StyleSheet.create({
   dateAssigned: { fontSize: 11, color: '#10b981', fontWeight: '600', marginTop: 2 },
   dateEmpty:    { fontSize: 11, color: '#9ca3af', marginTop: 2 },
   activeArrow:  { fontSize: 16, color: '#10b981', fontWeight: '700' },
+  infoBtn:      { fontSize: 18, color: '#9ca3af', marginLeft: 4 },
+
+  previewSafe:   { flex: 1, backgroundColor: '#f9fafb' },
+  previewHeader: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 16, paddingVertical: 12,
+    borderBottomWidth: 1, borderBottomColor: '#e5e7eb', backgroundColor: '#fff',
+  },
+  previewClose:  { color: '#6b7280', fontSize: 15, minWidth: 48 },
+  previewTitle:  { flex: 1, fontSize: 14, fontWeight: '700', color: '#111827', textAlign: 'center', marginHorizontal: 8 },
+  previewScroll: { padding: 16, gap: 10 },
+  previewExCard: {
+    backgroundColor: '#fff', borderRadius: 12, padding: 12,
+    shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 4, shadowOffset: { width: 0, height: 1 },
+    gap: 4,
+  },
+  previewExName: { fontSize: 14, fontWeight: '700', color: '#111827', marginBottom: 2 },
+  previewBlock:  { fontSize: 13, color: '#374151' },
+  previewEmpty:  { fontSize: 14, color: '#9ca3af', textAlign: 'center', marginTop: 32 },
 });
