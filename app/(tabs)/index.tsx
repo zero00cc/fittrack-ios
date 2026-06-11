@@ -18,6 +18,7 @@ const features: Array<{
   { route: '/calories',  iconName: 'nutrition', iconColor: '#059669', label: 'Calorie Tracker',  desc: 'Log meals and track daily intake.',        color: '#d1fae5', border: '#6ee7b7' },
   { route: '/workouts',  iconName: 'barbell',   iconColor: '#2563eb', label: 'Workout Plans',    desc: 'Follow structured training plans.',        color: '#dbeafe', border: '#93c5fd' },
   { route: '/exercises', iconName: 'body',      iconColor: '#7c3aed', label: 'Exercise Library', desc: 'Video demos and step-by-step guidance.',   color: '#ede9fe', border: '#c4b5fd' },
+  { route: '/resources', iconName: 'library',  iconColor: '#0891b2', label: 'Resources',        desc: 'Training tutorials for squat, bench & deadlift.', color: '#e0f2fe', border: '#7dd3fc' },
 ];
 
 export default function HomeScreen() {
