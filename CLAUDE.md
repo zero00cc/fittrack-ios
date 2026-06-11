@@ -75,9 +75,11 @@ All tabs live in `app/(tabs)/`: `index`, `calories`, `workouts`, `exercises`, `g
 
 `CalorieGoals` (in `types/calorie.types.ts`) now holds full macros: `{ calories, protein, carbs, fat }`. The `fittrack_calorie_settings` AsyncStorage key stores this shape. **Legacy format** (`{ dailyTarget }`) is normalised on read inside `useCalorieStore` — do not remove that normalisation.
 
-### Food photo analysis
+### Food photo analysis & AI reports
 
 `utils/analyzeFood.ts` calls `claude-haiku-4-5-20251001` with a base64-encoded image. On web, it uses `fetch + FileReader` instead of `expo-file-system/legacy` (which throws on web). The result is an `AnalysisResult` with `items: AnalyzedItem[]`. The `calories.tsx` tab sets `pendingImage` (an exported module-level ref) before navigating to `calorie-result`, which reads it on mount.
+
+`utils/generateReport.ts` also calls `claude-haiku-4-5-20251001` (direct `fetch` to `https://api.anthropic.com/v1/messages`) to generate a weekly or monthly plain-text fitness report from calorie history, macro averages, and the weight log. Both utils use `EXPO_PUBLIC_ANTHROPIC_KEY` and set `anthropic-dangerous-direct-browser-access: true` for browser compatibility.
 
 ### Workout plan system
 
@@ -106,18 +108,31 @@ Unlocked when `workoutState.planHistory.length > 0`. Uses IPF weight classes def
 | `fittrack_user_profile` | `UserProfile` — body stats and goal used for BMR/TDEE; not synced to Supabase |
 | `fittrack_workout_state` | `WorkoutState` — selected level, active plan ID, day status map, plan history |
 | `fittrack_gallery_meta` | Gallery item metadata (URIs, dates, categories) |
+| `fittrack_weight_log` | `Record<string, number>` — daily body weight in kg, keyed by `YYYY-MM-DD` |
 
 ## Supabase tables
 
 | Table | Key columns | Notes |
 |---|---|---|
 | `calorie_history` | `user_id`, `data` (JSON blob), `updated_at` | entire history as one JSON value |
-| `calorie_settings` | `user_id`, `daily_target` | syncs only the calorie target (flat column, not full `CalorieGoals`) |
+| `calorie_settings` | `user_id`, `daily_target`, `protein_target`, `carbs_target`, `fat_target` | flat macro columns (not a JSON blob); macro columns added via `supabase/migrations.sql` |
+| `weight_log` | `user_id`, `data` (JSON blob), `updated_at` | entire weight log as one JSON value; same pattern as `calorie_history` |
 | `workout_state` | `user_id`, `data` (JSON blob), `updated_at` | entire `WorkoutState` as JSON, includes `planHistory` |
 | `gallery_items` | `user_id`, `id`, `name`, `date`, `category`, `storage_path` | metadata only; images in Storage bucket `gallery` |
 | `leaderboard` | `user_id`, `gender`, `body_mass`, `squat`, `bench`, `deadlift`, `total` (generated), `weight_class` | one row per user, upsert on `user_id` |
 
-All tables have RLS enabled. `calorie_history`, `workout_state`, and `gallery_items` use `onConflict: 'user_id'` upserts.
+All tables have RLS enabled. `calorie_history`, `weight_log`, `workout_state`, and `gallery_items` use `onConflict: 'user_id'` upserts.
+
+Pending schema migrations are in `supabase/migrations.sql` — run them in the Supabase SQL editor when setting up a new project.
+
+## Design system
+
+All color tokens live in `constants/theme.ts` — a golden amber palette (warm cream background). Import named exports (`BG`, `CARD`, `ACCENT`, `TEXT`, `MUTED`, etc.) instead of hardcoding hex values. Do not add new color literals outside this file.
+
+## Utility helpers
+
+- `utils/calorieUtils.ts` — `dayTotals(log)` sums calories/protein/carbs/fat across a `DailyLog`
+- `utils/dateUtils.ts` — `todayYMD()` returns today as `YYYY-MM-DD`; `getLast30Days()` returns an array of the last 30 date strings
 
 ## Git workflow
 
