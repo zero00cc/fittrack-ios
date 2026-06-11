@@ -6,9 +6,8 @@ import { todayYMD } from '../../utils/dateUtils';
 
 function fmtBlock(b: SetBlock): string {
   const reps = b.reps != null ? `×${b.reps}` : ' sets';
-  const rpe  = b.rpe  != null ? ` @${b.rpe}` : '';
   const load = b.load != null ? ` (${b.load} kg)` : '';
-  return `${b.sets}${reps}${rpe}${load}`;
+  return `${b.sets}${reps}${load}`;
 }
 
 const DOW = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
