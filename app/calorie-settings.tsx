@@ -91,7 +91,7 @@ export default function CalorieSettingsScreen() {
   if (loading) return <View style={s.loading}><ActivityIndicator color={ACCENT} /></View>;
 
   return (
-    <SafeAreaView style={s.safe}>
+    <SafeAreaView style={s.safe} edges={['bottom']}>
       <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
 
         {/* Targets card */}
@@ -202,47 +202,47 @@ export default function CalorieSettingsScreen() {
 const s = StyleSheet.create({
   safe:          { flex: 1, backgroundColor: BG },
   loading:       { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: BG },
-  scroll:        { padding: 16, gap: 6, paddingBottom: 32 },
+  scroll:        { padding: 14, gap: 0, paddingBottom: 28 },
 
-  targetsCard:   { backgroundColor: CARD, borderRadius: 14, padding: 16, gap: 12, borderWidth: 1, borderColor: BORDER },
-  targetsTitle:  { fontSize: 16, fontWeight: '700', color: TEXT, fontFamily: SERIF },
-  targetsSub:    { fontSize: 11, color: MUTED, marginTop: -6 },
-  targetsGrid:   { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  targetTile:    { width: '47%', backgroundColor: BG, borderRadius: 10, padding: 12, alignItems: 'center', gap: 4, borderWidth: 1, borderColor: BORDER },
-  targetLabel:   { fontSize: 10, color: MUTED, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.4 },
-  targetInput:   { fontSize: 24, fontWeight: '900', textAlign: 'center', width: '100%', paddingVertical: 2, fontFamily: SERIF },
-  targetUnit:    { fontSize: 10, color: DIM },
+  targetsCard:   { backgroundColor: CARD, borderRadius: 14, padding: 14, gap: 10, borderWidth: 1, borderColor: BORDER },
+  targetsTitle:  { fontSize: 15, fontWeight: '700', color: TEXT, fontFamily: SERIF },
+  targetsSub:    { fontSize: 11, color: MUTED, marginTop: -4 },
+  targetsGrid:   { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  targetTile:    { width: '47%', backgroundColor: BG, borderRadius: 10, paddingVertical: 10, paddingHorizontal: 10, alignItems: 'center', gap: 2, borderWidth: 1, borderColor: BORDER },
+  targetLabel:   { fontSize: 9, color: MUTED, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5 },
+  targetInput:   { fontSize: 22, fontWeight: '900', textAlign: 'center', width: '100%', paddingVertical: 2, fontFamily: SERIF },
+  targetUnit:    { fontSize: 9, color: DIM },
 
-  sectionLabel:  { fontSize: 11, fontWeight: '700', color: ACCENT, textTransform: 'uppercase', letterSpacing: 0.8, marginTop: 14, marginBottom: 6 },
+  sectionLabel:  { fontSize: 10, fontWeight: '700', color: ACCENT, textTransform: 'uppercase', letterSpacing: 0.9, marginTop: 14, marginBottom: 5 },
 
-  pillRow:       { flexDirection: 'row', gap: 10 },
-  pill:          { flex: 1, backgroundColor: CARD, borderRadius: 10, paddingVertical: 14, alignItems: 'center', borderWidth: 1.5, borderColor: BORDER },
+  pillRow:       { flexDirection: 'row', gap: 8 },
+  pill:          { flex: 1, backgroundColor: CARD, borderRadius: 10, paddingVertical: 11, alignItems: 'center', borderWidth: 1.5, borderColor: BORDER },
   pillOn:        { backgroundColor: TEXT, borderColor: TEXT },
-  pillTxt:       { fontSize: 15, fontWeight: '700', color: MUTED },
+  pillTxt:       { fontSize: 14, fontWeight: '700', color: MUTED },
   pillTxtOn:     { color: BG },
 
-  fieldRow:      { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  numInput:      { backgroundColor: CARD, color: TEXT, fontSize: 20, fontWeight: '800', borderRadius: 9, paddingHorizontal: 16, paddingVertical: 12, width: 100, textAlign: 'center', borderWidth: 1, borderColor: BORDER, fontFamily: SERIF },
-  unit:          { fontSize: 14, color: MUTED },
-  toggle:        { flexDirection: 'row', gap: 6 },
-  toggleBtn:     { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 7, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER },
+  fieldRow:      { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  numInput:      { backgroundColor: CARD, color: TEXT, fontSize: 18, fontWeight: '800', borderRadius: 9, paddingHorizontal: 14, paddingVertical: 10, width: 90, textAlign: 'center', borderWidth: 1, borderColor: BORDER, fontFamily: SERIF },
+  unit:          { fontSize: 13, color: MUTED },
+  toggle:        { flexDirection: 'row', gap: 5 },
+  toggleBtn:     { paddingHorizontal: 13, paddingVertical: 7, borderRadius: 7, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER },
   toggleOn:      { backgroundColor: TEXT, borderColor: TEXT },
-  toggleTxt:     { fontSize: 13, fontWeight: '600', color: MUTED },
+  toggleTxt:     { fontSize: 12, fontWeight: '600', color: MUTED },
   toggleTxtOn:   { color: BG },
 
-  optList:       { gap: 6 },
-  optCard:       { flexDirection: 'row', alignItems: 'center', backgroundColor: CARD, borderRadius: 10, padding: 12, gap: 10, borderWidth: 1.5, borderColor: 'transparent' },
+  optList:       { gap: 5 },
+  optCard:       { flexDirection: 'row', alignItems: 'center', backgroundColor: CARD, borderRadius: 10, padding: 10, gap: 10, borderWidth: 1.5, borderColor: 'transparent' },
   optCardOn:     { borderColor: ACCENT },
-  radio:         { width: 18, height: 18, borderRadius: 9, borderWidth: 2, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
-  radioDot:      { width: 8, height: 8, borderRadius: 4, backgroundColor: ACCENT },
+  radio:         { width: 16, height: 16, borderRadius: 8, borderWidth: 2, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
+  radioDot:      { width: 7, height: 7, borderRadius: 3.5, backgroundColor: ACCENT },
   optLabel:      { fontSize: 13, fontWeight: '700', color: MUTED },
   optLabelOn:    { color: TEXT },
   optDesc:       { fontSize: 11, color: DIM, marginTop: 1 },
   optMult:       { fontSize: 11, color: BORDER, fontWeight: '700' },
 
-  recalcBtn:     { marginTop: 16, backgroundColor: BG, borderRadius: 12, paddingVertical: 15, alignItems: 'center', borderWidth: 1.5, borderColor: ACCENT },
-  recalcTxt:     { color: ACCENT, fontSize: 14, fontWeight: '700', letterSpacing: 0.3 },
+  recalcBtn:     { marginTop: 14, backgroundColor: BG, borderRadius: 12, paddingVertical: 12, alignItems: 'center', borderWidth: 1.5, borderColor: ACCENT },
+  recalcTxt:     { color: ACCENT, fontSize: 13, fontWeight: '700', letterSpacing: 0.3 },
 
-  saveBtn:       { backgroundColor: ACCENT, borderRadius: 10, paddingVertical: 14, alignItems: 'center' },
-  saveTxt:       { color: BG, fontSize: 15, fontWeight: '800' },
+  saveBtn:       { backgroundColor: ACCENT, borderRadius: 10, paddingVertical: 12, alignItems: 'center' },
+  saveTxt:       { color: BG, fontSize: 14, fontWeight: '800' },
 });

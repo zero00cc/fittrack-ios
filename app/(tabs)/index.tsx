@@ -4,14 +4,21 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import { useWorkoutStore } from '../../hooks/useWorkoutStore';
+import {
+  BG, CARD, BORDER, TEXT, MUTED, DIM,
+  ACCENT, ACCENT_DARK, SERIF,
+} from '../../constants/theme';
 
 type IoniconsName = React.ComponentProps<typeof Ionicons>['name'];
 
-const features: Array<{ route: string; iconName: IoniconsName; iconColor: string; label: string; desc: string; color: string; border: string }> = [
-  { route: '/calories',  iconName: 'nutrition',       iconColor: '#059669', label: 'Calorie Tracker',  desc: 'Log meals and track daily intake.',       color: '#d1fae5', border: '#6ee7b7' },
-  { route: '/workouts',  iconName: 'barbell',         iconColor: '#2563eb', label: 'Workout Plans',    desc: 'Follow structured training plans.',       color: '#dbeafe', border: '#93c5fd' },
-  { route: '/exercises', iconName: 'body',            iconColor: '#7c3aed', label: 'Exercise Library',  desc: 'Video demos and step-by-step guidance.', color: '#ede9fe', border: '#c4b5fd' },
-  { route: '/gallery',   iconName: 'images',          iconColor: '#ea580c', label: 'Gallery',           desc: 'Photos of your meals and workouts.',     color: '#ffedd5', border: '#fdba74' },
+const features: Array<{
+  route: string; iconName: IoniconsName; iconColor: string;
+  label: string; desc: string; color: string; border: string;
+}> = [
+  { route: '/calories',  iconName: 'nutrition', iconColor: '#059669', label: 'Calorie Tracker',  desc: 'Log meals and track daily intake.',        color: '#d1fae5', border: '#6ee7b7' },
+  { route: '/workouts',  iconName: 'barbell',   iconColor: '#2563eb', label: 'Workout Plans',    desc: 'Follow structured training plans.',        color: '#dbeafe', border: '#93c5fd' },
+  { route: '/exercises', iconName: 'body',      iconColor: '#7c3aed', label: 'Exercise Library', desc: 'Video demos and step-by-step guidance.',   color: '#ede9fe', border: '#c4b5fd' },
+  { route: '/gallery',   iconName: 'images',    iconColor: '#ea580c', label: 'Gallery',          desc: 'Photos of your meals and workouts.',       color: '#ffedd5', border: '#fdba74' },
 ];
 
 export default function HomeScreen() {
@@ -23,7 +30,7 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
-      {/* Header row with title + sign-out */}
+      {/* Header */}
       <View style={styles.header}>
         <View>
           <Text style={styles.heroTitle}>FitTrack</Text>
@@ -37,7 +44,6 @@ export default function HomeScreen() {
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         <Text style={styles.heroSub}>Track your nutrition and train with purpose.</Text>
 
-        {/* Feature cards — single column */}
         {features.map((f) => (
           <TouchableOpacity
             key={f.route}
@@ -45,14 +51,14 @@ export default function HomeScreen() {
             onPress={() => router.push(f.route as any)}
             activeOpacity={0.8}
           >
-            <View style={[styles.cardIconWrap, { backgroundColor: f.iconColor + '18' }]}>
-              <Ionicons name={f.iconName} size={26} color={f.iconColor} />
+            <View style={[styles.cardIconWrap, { backgroundColor: f.iconColor + '20' }]}>
+              <Ionicons name={f.iconName} size={22} color={f.iconColor} />
             </View>
             <View style={styles.cardText}>
               <Text style={styles.cardLabel}>{f.label}</Text>
               <Text style={styles.cardDesc}>{f.desc}</Text>
             </View>
-            <Text style={styles.cardChevron}>›</Text>
+            <Ionicons name="chevron-forward" size={16} color={f.iconColor + 'aa'} />
           </TouchableOpacity>
         ))}
 
@@ -62,8 +68,8 @@ export default function HomeScreen() {
           onPress={() => router.push('/ranking' as any)}
           activeOpacity={rankingUnlocked ? 0.8 : 0.6}
         >
-          <View style={[styles.cardIconWrap, { backgroundColor: rankingUnlocked ? '#a8780018' : '#9ca3af18' }]}>
-            <Ionicons name={rankingUnlocked ? 'trophy' : 'lock-closed'} size={26} color={rankingUnlocked ? '#a87800' : '#9ca3af'} />
+          <View style={[styles.cardIconWrap, { backgroundColor: rankingUnlocked ? '#a8780020' : '#9ca3af20' }]}>
+            <Ionicons name={rankingUnlocked ? 'trophy' : 'lock-closed'} size={22} color={rankingUnlocked ? '#a87800' : '#9ca3af'} />
           </View>
           <View style={styles.cardText}>
             <Text style={[styles.cardLabel, !rankingUnlocked && styles.rankingLabelLocked]}>
@@ -75,7 +81,11 @@ export default function HomeScreen() {
                 : 'Complete a workout plan to unlock the leaderboard.'}
             </Text>
           </View>
-          <Text style={[styles.cardChevron, !rankingUnlocked && { opacity: 0.3 }]}>›</Text>
+          <Ionicons
+            name={rankingUnlocked ? 'chevron-forward' : 'lock-closed'}
+            size={16}
+            color={rankingUnlocked ? '#a87800aa' : '#9ca3af66'}
+          />
         </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
@@ -83,30 +93,32 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe:               { flex: 1, backgroundColor: '#f9fafb' },
+  safe:   { flex: 1, backgroundColor: BG },
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 16, paddingTop: 12, paddingBottom: 8,
+    paddingHorizontal: 16, paddingTop: 8, paddingBottom: 4,
+    borderBottomWidth: 1, borderBottomColor: BORDER,
   },
-  heroTitle:          { fontSize: 22, fontWeight: '800', color: '#111827' },
-  userEmail:          { fontSize: 11, color: '#9ca3af', marginTop: 1 },
-  signOutBtn:         { backgroundColor: '#fee2e2', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 8 },
-  signOutText:        { color: '#ef4444', fontWeight: '700', fontSize: 13 },
-  scroll:             { padding: 16, gap: 10 },
-  heroSub:            { fontSize: 14, color: '#6b7280', marginBottom: 4 },
+  heroTitle:          { fontSize: 20, fontWeight: '800', color: TEXT, fontFamily: SERIF, letterSpacing: -0.3 },
+  userEmail:          { fontSize: 10, color: DIM, marginTop: 1 },
+  signOutBtn:         { backgroundColor: CARD, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6, borderWidth: 1, borderColor: BORDER },
+  signOutText:        { color: ACCENT_DARK, fontWeight: '700', fontSize: 12 },
+
+  scroll:             { padding: 14, gap: 8, paddingBottom: 20 },
+  heroSub:            { fontSize: 12, color: MUTED, marginBottom: 2, letterSpacing: 0.1 },
+
   card: {
-    flexDirection: 'row', alignItems: 'center', gap: 14,
-    borderRadius: 16, borderWidth: 2, padding: 16,
-    shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 8, shadowOffset: { width: 0, height: 2 },
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    borderRadius: 14, borderWidth: 1.5, padding: 13,
+    shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 6, shadowOffset: { width: 0, height: 2 },
   },
-  cardIconWrap:       { width: 50, height: 50, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  cardIconWrap:       { width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   cardText:           { flex: 1 },
-  cardLabel:          { fontSize: 16, fontWeight: '700', color: '#111827' },
-  cardDesc:           { fontSize: 12, color: '#6b7280', lineHeight: 17, marginTop: 2 },
-  cardChevron:        { fontSize: 24, color: '#9ca3af', fontWeight: '300' },
-  // Ranking overrides
+  cardLabel:          { fontSize: 14, fontWeight: '700', color: TEXT, letterSpacing: -0.1 },
+  cardDesc:           { fontSize: 11, color: '#6b7280', lineHeight: 15, marginTop: 1 },
+
   rankingCard:        { backgroundColor: '#fefce8', borderColor: '#fde68a' },
-  rankingCardLocked:  { backgroundColor: '#f3f4f6', borderColor: '#e5e7eb' },
-  rankingLabelLocked: { color: '#9ca3af' },
-  rankingDescLocked:  { color: '#9ca3af' },
+  rankingCardLocked:  { backgroundColor: CARD, borderColor: BORDER },
+  rankingLabelLocked: { color: MUTED },
+  rankingDescLocked:  { color: DIM },
 });
