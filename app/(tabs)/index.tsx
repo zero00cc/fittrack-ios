@@ -1,15 +1,18 @@
 import { ScrollView, View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import { useWorkoutStore } from '../../hooks/useWorkoutStore';
 
-const features = [
-  { route: '/calories',  icon: '🥗', label: 'Calorie Tracker',  desc: 'Log meals and track daily intake.',       color: '#d1fae5', border: '#6ee7b7' },
-  { route: '/workouts',  icon: '🏋️', label: 'Workout Plans',    desc: 'Follow structured training plans.',       color: '#dbeafe', border: '#93c5fd' },
-  { route: '/exercises', icon: '🎬', label: 'Exercise Library',  desc: 'Video demos and step-by-step guidance.', color: '#ede9fe', border: '#c4b5fd' },
-  { route: '/gallery',   icon: '📸', label: 'Gallery',           desc: 'Photos of your meals and workouts.',     color: '#ffedd5', border: '#fdba74' },
-] as const;
+type IoniconsName = React.ComponentProps<typeof Ionicons>['name'];
+
+const features: Array<{ route: string; iconName: IoniconsName; iconColor: string; label: string; desc: string; color: string; border: string }> = [
+  { route: '/calories',  iconName: 'nutrition',       iconColor: '#059669', label: 'Calorie Tracker',  desc: 'Log meals and track daily intake.',       color: '#d1fae5', border: '#6ee7b7' },
+  { route: '/workouts',  iconName: 'barbell',         iconColor: '#2563eb', label: 'Workout Plans',    desc: 'Follow structured training plans.',       color: '#dbeafe', border: '#93c5fd' },
+  { route: '/exercises', iconName: 'body',            iconColor: '#7c3aed', label: 'Exercise Library',  desc: 'Video demos and step-by-step guidance.', color: '#ede9fe', border: '#c4b5fd' },
+  { route: '/gallery',   iconName: 'images',          iconColor: '#ea580c', label: 'Gallery',           desc: 'Photos of your meals and workouts.',     color: '#ffedd5', border: '#fdba74' },
+];
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -39,10 +42,12 @@ export default function HomeScreen() {
           <TouchableOpacity
             key={f.route}
             style={[styles.card, { backgroundColor: f.color, borderColor: f.border }]}
-            onPress={() => router.push(f.route)}
+            onPress={() => router.push(f.route as any)}
             activeOpacity={0.8}
           >
-            <Text style={styles.cardIcon}>{f.icon}</Text>
+            <View style={[styles.cardIconWrap, { backgroundColor: f.iconColor + '18' }]}>
+              <Ionicons name={f.iconName} size={26} color={f.iconColor} />
+            </View>
             <View style={styles.cardText}>
               <Text style={styles.cardLabel}>{f.label}</Text>
               <Text style={styles.cardDesc}>{f.desc}</Text>
@@ -57,7 +62,9 @@ export default function HomeScreen() {
           onPress={() => router.push('/ranking' as any)}
           activeOpacity={rankingUnlocked ? 0.8 : 0.6}
         >
-          <Text style={styles.cardIcon}>{rankingUnlocked ? '🏆' : '🔒'}</Text>
+          <View style={[styles.cardIconWrap, { backgroundColor: rankingUnlocked ? '#a8780018' : '#9ca3af18' }]}>
+            <Ionicons name={rankingUnlocked ? 'trophy' : 'lock-closed'} size={26} color={rankingUnlocked ? '#a87800' : '#9ca3af'} />
+          </View>
           <View style={styles.cardText}>
             <Text style={[styles.cardLabel, !rankingUnlocked && styles.rankingLabelLocked]}>
               Global Ranking
@@ -92,7 +99,7 @@ const styles = StyleSheet.create({
     borderRadius: 16, borderWidth: 2, padding: 16,
     shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 8, shadowOffset: { width: 0, height: 2 },
   },
-  cardIcon:           { fontSize: 30, width: 38, textAlign: 'center' },
+  cardIconWrap:       { width: 50, height: 50, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   cardText:           { flex: 1 },
   cardLabel:          { fontSize: 16, fontWeight: '700', color: '#111827' },
   cardDesc:           { fontSize: 12, color: '#6b7280', lineHeight: 17, marginTop: 2 },

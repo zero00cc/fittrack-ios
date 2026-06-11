@@ -3,6 +3,7 @@ import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
   StyleSheet, ActivityIndicator,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useWorkoutStore } from '../../hooks/useWorkoutStore';
@@ -67,7 +68,9 @@ export default function RankingScreen() {
           <Text style={styles.backBtnText}>← Home</Text>
         </TouchableOpacity>
         <View style={styles.lockedContainer}>
-          <Text style={styles.lockedIcon}>🔒</Text>
+          <View style={styles.lockedIconWrap}>
+            <Ionicons name="lock-closed" size={36} color="#9ca3af" />
+          </View>
           <Text style={styles.lockedTitle}>Ranking Locked</Text>
           <Text style={styles.lockedDesc}>
             Complete at least one workout plan to unlock the global leaderboard.
@@ -236,7 +239,10 @@ export default function RankingScreen() {
 
         {/* Edit / Set up buttons */}
         <TouchableOpacity style={styles.editBtn} onPress={() => setScreen('form')}>
-          <Text style={styles.editBtnText}>{myProfile ? '✏️  Edit My Stats' : '+ Set Up My Profile'}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            {myProfile && <Ionicons name="create-outline" size={16} color="#fff" />}
+            <Text style={styles.editBtnText}>{myProfile ? 'Edit My Stats' : '+ Set Up My Profile'}</Text>
+          </View>
         </TouchableOpacity>
 
         {/* Filter bar */}
@@ -314,7 +320,7 @@ const styles = StyleSheet.create({
   safe:            { flex: 1, backgroundColor: '#f9fafb' },
   scroll:          { padding: 16, gap: 12 },
   lockedContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 40 },
-  lockedIcon:      { fontSize: 56, marginBottom: 16 },
+  lockedIconWrap:  { width: 88, height: 88, borderRadius: 44, backgroundColor: '#f3f4f6', alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
   lockedTitle:     { fontSize: 22, fontWeight: '800', color: '#111827', textAlign: 'center' },
   lockedDesc:      { fontSize: 14, color: '#6b7280', textAlign: 'center', marginTop: 8, lineHeight: 21 },
   backBtn:         { alignSelf: 'flex-end', marginBottom: 4 },

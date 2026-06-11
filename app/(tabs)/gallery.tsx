@@ -4,6 +4,7 @@ import {
   StyleSheet, Alert, Dimensions, Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useGalleryStore } from '../../hooks/useGalleryStore';
 import { GalleryCategory } from '../../types/gallery.types';
@@ -12,9 +13,10 @@ const { width } = Dimensions.get('window');
 const COLS = 3;
 const TILE = (width - 32 - (COLS - 1) * 4) / COLS;
 
-const TABS: Array<{ key: GalleryCategory; label: string; icon: string }> = [
-  { key: 'meal', label: 'Meals', icon: '🍽️' },
-  { key: 'workout', label: 'Workouts', icon: '💪' },
+type IoniconsName = React.ComponentProps<typeof Ionicons>['name'];
+const TABS: Array<{ key: GalleryCategory; label: string; iconName: IoniconsName }> = [
+  { key: 'meal',    label: 'Meals',    iconName: 'restaurant' },
+  { key: 'workout', label: 'Workouts', iconName: 'barbell'    },
 ];
 
 export default function GalleryScreen() {
@@ -56,9 +58,10 @@ export default function GalleryScreen() {
             onPress={() => setTab(t.key)}
             style={[styles.tabBtn, tab === t.key && styles.tabBtnActive]}
           >
-            <Text style={[styles.tabBtnText, tab === t.key && styles.tabBtnTextActive]}>
-              {t.icon} {t.label}
-            </Text>
+            <View style={styles.tabBtnInner}>
+              <Ionicons name={t.iconName} size={16} color={tab === t.key ? '#fff' : '#6b7280'} />
+              <Text style={[styles.tabBtnText, tab === t.key && styles.tabBtnTextActive]}>{t.label}</Text>
+            </View>
           </TouchableOpacity>
         ))}
       </View>
@@ -74,7 +77,9 @@ export default function GalleryScreen() {
         <View style={styles.center}><Text style={styles.loading}>Loading…</Text></View>
       ) : filtered.length === 0 ? (
         <View style={styles.empty}>
-          <Text style={styles.emptyIcon}>{tab === 'meal' ? '🍽️' : '💪'}</Text>
+          <View style={styles.emptyIconWrap}>
+            <Ionicons name={tab === 'meal' ? 'restaurant' : 'barbell'} size={40} color="#9ca3af" />
+          </View>
           <Text style={styles.emptyText}>No {tab} photos yet.</Text>
           <Text style={styles.emptyHint}>Tap "Upload Photo" to add one.</Text>
         </View>
@@ -120,17 +125,18 @@ export default function GalleryScreen() {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: '#f9fafb' },
   tabBar: { flexDirection: 'row', backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#e5e7eb' },
-  tabBtn: { flex: 1, paddingVertical: 12, alignItems: 'center', borderBottomWidth: 2, borderBottomColor: 'transparent' },
-  tabBtnActive: { borderBottomColor: '#10b981' },
-  tabBtnText: { fontSize: 14, fontWeight: '600', color: '#9ca3af' },
-  tabBtnTextActive: { color: '#10b981' },
+  tabBtn: { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 10, marginHorizontal: 4, marginVertical: 6 },
+  tabBtnActive: { backgroundColor: '#10b981' },
+  tabBtnInner: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  tabBtnText: { fontSize: 14, fontWeight: '600', color: '#6b7280' },
+  tabBtnTextActive: { color: '#fff' },
   uploadRow: { padding: 12 },
   uploadBtn: { backgroundColor: '#10b981', borderRadius: 12, padding: 12, alignItems: 'center' },
   uploadBtnText: { color: '#fff', fontWeight: '700', fontSize: 14 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   loading: { color: '#9ca3af' },
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 8 },
-  emptyIcon: { fontSize: 48 },
+  emptyIconWrap: { width: 80, height: 80, borderRadius: 40, backgroundColor: '#f3f4f6', alignItems: 'center', justifyContent: 'center' },
   emptyText: { fontSize: 16, fontWeight: '600', color: '#374151' },
   emptyHint: { fontSize: 13, color: '#9ca3af' },
   grid: { padding: 12 },

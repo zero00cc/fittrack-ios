@@ -14,6 +14,7 @@ import { todayYMD, addDays } from '../../utils/dateUtils';
 import { DonutRing } from '../../components/calorie/DonutRing';
 import { USER_PROFILE_KEY, UserProfile } from '../../utils/nutritionCalc';
 import { generateReport, ReportType } from '../../utils/generateReport';
+import { Ionicons } from '@expo/vector-icons';
 import {
   BG, CARD, CARD2, BORDER, TEXT, MUTED, DIM,
   ACCENT, ACCENT_SOFT, ACCENT_MID, ACCENT_DARK, SERIF,
@@ -552,11 +553,12 @@ export default function CaloriesScreen() {
   const isToday   = selectedDate === todayYMD();
   const remaining = goals.calories - totals.calories;
 
-  const FAB_OPTIONS = [
-    { icon: '📷', label: 'Scan Food',     sub: 'Take a photo to analyse',    onPress: () => { setFabOpen(false); openCamera();         } },
-    { icon: '🖼️', label: 'Upload Photo',  sub: 'Choose from your library',   onPress: () => { setFabOpen(false); openLibrary();        } },
-    { icon: '✏️', label: 'Add Manually',  sub: 'Enter nutrition details',     onPress: () => { setFabOpen(false); setAddManual(true);   } },
-    { icon: '⚖️', label: 'Log Weight',    sub: 'Record your weight for today', onPress: () => { setFabOpen(false); setLogWeight(true);  } },
+  type IoniconsName = React.ComponentProps<typeof Ionicons>['name'];
+  const FAB_OPTIONS: Array<{ iconName: IoniconsName; iconColor: string; label: string; sub: string; onPress: () => void }> = [
+    { iconName: 'camera',        iconColor: '#7c3aed', label: 'Scan Food',     sub: 'Take a photo to analyse',     onPress: () => { setFabOpen(false); openCamera();         } },
+    { iconName: 'image',         iconColor: '#2563eb', label: 'Upload Photo',  sub: 'Choose from your library',    onPress: () => { setFabOpen(false); openLibrary();        } },
+    { iconName: 'create',        iconColor: '#059669', label: 'Add Manually',  sub: 'Enter nutrition details',      onPress: () => { setFabOpen(false); setAddManual(true);   } },
+    { iconName: 'speedometer',   iconColor: '#dc2626', label: 'Log Weight',    sub: 'Record your weight for today', onPress: () => { setFabOpen(false); setLogWeight(true);  } },
   ];
 
   return (
@@ -660,7 +662,9 @@ export default function CaloriesScreen() {
               <Text style={fm.sheetTitle}>Add to Log</Text>
               {FAB_OPTIONS.map((opt) => (
                 <TouchableOpacity key={opt.label} style={fm.option} onPress={opt.onPress} activeOpacity={0.75}>
-                  <View style={fm.iconBadge}><Text style={fm.optionIcon}>{opt.icon}</Text></View>
+                  <View style={[fm.iconBadge, { backgroundColor: opt.iconColor + '15' }]}>
+                    <Ionicons name={opt.iconName} size={22} color={opt.iconColor} />
+                  </View>
                   <View style={{ flex: 1 }}>
                     <Text style={fm.optionLabel}>{opt.label}</Text>
                     <Text style={fm.optionSub}>{opt.sub}</Text>

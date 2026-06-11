@@ -1,5 +1,6 @@
 import { ScrollView, View, Text, TouchableOpacity, Linking, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import { exercises } from '../../data/exercises';
 
 export default function ExercisesScreen() {
@@ -30,7 +31,8 @@ export default function ExercisesScreen() {
               </TouchableOpacity>
             ) : (
               <View style={styles.videoPlaceholder}>
-                <Text style={styles.videoPlaceholderText}>🎬  Video coming soon</Text>
+                <Ionicons name="play-circle-outline" size={22} color="#9ca3af" />
+                <Text style={styles.videoPlaceholderText}>Video coming soon</Text>
               </View>
             )}
 
@@ -72,7 +74,7 @@ const styles = StyleSheet.create({
   desc: { fontSize: 13, color: '#6b7280', lineHeight: 19 },
   videoBtn: { backgroundColor: '#fee2e2', borderRadius: 12, padding: 14, alignItems: 'center' },
   videoBtnText: { color: '#ef4444', fontWeight: '700', fontSize: 14 },
-  videoPlaceholder: { backgroundColor: '#f3f4f6', borderRadius: 12, padding: 14, alignItems: 'center' },
+  videoPlaceholder: { backgroundColor: '#f3f4f6', borderRadius: 12, padding: 14, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8 },
   videoPlaceholderText: { color: '#9ca3af', fontSize: 13 },
   sectionLabel: { fontSize: 13, fontWeight: '700', color: '#374151' },
   stepRow: { flexDirection: 'row', gap: 10, alignItems: 'flex-start' },

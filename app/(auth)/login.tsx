@@ -4,6 +4,7 @@ import {
   StyleSheet, KeyboardAvoidingView, Platform, ActivityIndicator,
 } from 'react-native';
 import { router } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 
 export default function LoginScreen() {
@@ -47,7 +48,9 @@ export default function LoginScreen() {
     return (
       <KeyboardAvoidingView style={styles.safe} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <View style={styles.inner}>
-          <Text style={styles.logo}>✉️</Text>
+          <View style={styles.logoWrap}>
+            <Ionicons name="mail" size={36} color="#fff" />
+          </View>
           <Text style={styles.title}>Check your email</Text>
           <Text style={styles.subtitle}>
             We sent a confirmation link to{'\n'}
@@ -71,7 +74,9 @@ export default function LoginScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <View style={styles.inner}>
-        <Text style={styles.logo}>🏋️</Text>
+        <View style={styles.logoWrap}>
+          <Ionicons name="barbell" size={36} color="#fff" />
+        </View>
         <Text style={styles.title}>FitTrack</Text>
         <Text style={styles.subtitle}>
           {mode === 'login' ? 'Sign in to your account' : 'Create your account'}
@@ -128,7 +133,7 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   safe:       { flex: 1, backgroundColor: '#f9fafb' },
   inner:      { flex: 1, justifyContent: 'center', padding: 28 },
-  logo:       { fontSize: 56, textAlign: 'center', marginBottom: 8 },
+  logoWrap:   { width: 80, height: 80, borderRadius: 40, backgroundColor: '#10b981', alignItems: 'center', justifyContent: 'center', alignSelf: 'center', marginBottom: 16, shadowColor: '#10b981', shadowOpacity: 0.35, shadowRadius: 12, shadowOffset: { width: 0, height: 4 } },
   title:      { fontSize: 28, fontWeight: '800', color: '#111827', textAlign: 'center' },
   subtitle:   { fontSize: 14, color: '#6b7280', textAlign: 'center', marginBottom: 32, marginTop: 4, lineHeight: 22 },
   input: {

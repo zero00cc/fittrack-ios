@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Modal, StyleSheet, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { useWorkoutStore } from '../../hooks/useWorkoutStore';
 import { workoutPlans } from '../../data/workoutPlans';
 import { exercises as libraryExercises } from '../../data/exercises';
@@ -27,11 +28,13 @@ type DailyDateConfirm =
   | { type: 'add';    dateYMD: string; nextDay: WorkoutDay }
   | { type: 'remove'; dateYMD: string; dayNumber: number; dayLabel: string };
 
-const LEVELS: Array<{ id: TrainingLevel; label: string; icon: string; desc: string; color: string; border: string }> = [
-  { id: 'beginner',     label: 'Beginner',          icon: '🌱', desc: 'New to weight training. Plans focused on building a movement foundation.', color: '#f0fdf4', border: '#4ade80' },
-  { id: 'intermediate', label: 'Intermediate',       icon: '⚡', desc: '6+ months of training. Structured progressive overload.',                  color: '#eff6ff', border: '#60a5fa' },
-  { id: 'professional', label: 'Professional',       icon: '🏆', desc: 'Advanced lifter. High-intensity programs including Meta 5/3/1.',           color: '#faf5ff', border: '#c084fc' },
-  { id: 'personalized', label: 'Personalized Plans', icon: '✏️', desc: 'Build your own plan by choosing exercises from the library day by day.',   color: '#fff7ed', border: '#fb923c' },
+type IoniconsName = React.ComponentProps<typeof Ionicons>['name'];
+
+const LEVELS: Array<{ id: TrainingLevel; label: string; iconName: IoniconsName; iconColor: string; desc: string; color: string; border: string }> = [
+  { id: 'beginner',     label: 'Beginner',          iconName: 'leaf',    iconColor: '#16a34a', desc: 'New to weight training. Plans focused on building a movement foundation.', color: '#f0fdf4', border: '#4ade80' },
+  { id: 'intermediate', label: 'Intermediate',       iconName: 'flash',   iconColor: '#2563eb', desc: '6+ months of training. Structured progressive overload.',                  color: '#eff6ff', border: '#60a5fa' },
+  { id: 'professional', label: 'Professional',       iconName: 'trophy',  iconColor: '#7c3aed', desc: 'Advanced lifter. High-intensity programs including Meta 5/3/1.',           color: '#faf5ff', border: '#c084fc' },
+  { id: 'personalized', label: 'Personalized Plans', iconName: 'create',  iconColor: '#ea580c', desc: 'Build your own plan by choosing exercises from the library day by day.',   color: '#fff7ed', border: '#fb923c' },
 ];
 
 const STATUS_LABELS: Record<DayStatus, string> = { finished: '✓ Done', skipped: '– Skipped', unfinished: 'Pending' };
@@ -329,7 +332,7 @@ export default function WorkoutsScreen() {
 
           {myPlans.length === 0 ? (
             <View style={styles.emptyCard}>
-              <Text style={styles.emptyIcon}>📋</Text>
+              <View style={styles.emptyIconWrap}><Ionicons name="clipboard-outline" size={32} color="#9ca3af" /></View>
               <Text style={styles.emptyTitle}>No plans yet</Text>
               <Text style={styles.emptyDesc}>Create your first personalized workout plan below.</Text>
             </View>
@@ -574,7 +577,9 @@ export default function WorkoutsScreen() {
               onPress={() => handleSelectLevel(l.id)}
               activeOpacity={0.8}
             >
-              <Text style={styles.levelIcon}>{l.icon}</Text>
+              <View style={[styles.levelIconWrap, { backgroundColor: l.iconColor + '18' }]}>
+                <Ionicons name={l.iconName} size={24} color={l.iconColor} />
+              </View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.levelLabel}>{l.label}</Text>
                 <Text style={styles.levelDesc}>{l.desc}</Text>
@@ -624,7 +629,7 @@ export default function WorkoutsScreen() {
           <Text style={styles.pageTitle}>{LEVELS.find((l) => l.id === workoutState.selectedLevel)?.label} Plans</Text>
           {filteredPlans.length === 0 ? (
             <View style={styles.emptyCard}>
-              <Text style={styles.emptyIcon}>🚧</Text>
+              <View style={styles.emptyIconWrap}><Ionicons name="construct-outline" size={32} color="#9ca3af" /></View>
               <Text style={styles.emptyTitle}>Coming Soon</Text>
               <Text style={styles.emptyDesc}>Plans for this level are coming soon.</Text>
             </View>
@@ -1082,7 +1087,7 @@ const styles = StyleSheet.create({
   backBtn: { marginBottom: 4 },
   backBtnText: { color: '#10b981', fontSize: 14, fontWeight: '600' },
   levelCard: { borderRadius: 16, borderWidth: 2, padding: 16, flexDirection: 'row', gap: 12, alignItems: 'center' },
-  levelIcon: { fontSize: 32 },
+  levelIconWrap: { width: 48, height: 48, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   levelLabel: { fontSize: 16, fontWeight: '700', color: '#111827' },
   levelDesc: { fontSize: 12, color: '#6b7280', marginTop: 3, lineHeight: 17 },
   planCard: { backgroundColor: '#fff', borderRadius: 16, padding: 16, flexDirection: 'row', gap: 12, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 8, shadowOffset: { width: 0, height: 2 } },
@@ -1116,7 +1121,7 @@ const styles = StyleSheet.create({
   dayExCount: { fontSize: 11, color: '#9ca3af', marginTop: 2 },
   dayStatus: { fontSize: 12, fontWeight: '700' },
   emptyCard: { alignItems: 'center', paddingVertical: 40, backgroundColor: '#fff', borderRadius: 16, borderWidth: 2, borderStyle: 'dashed', borderColor: '#e5e7eb' },
-  emptyIcon: { fontSize: 36, marginBottom: 8 },
+  emptyIconWrap: { width: 64, height: 64, borderRadius: 32, backgroundColor: '#f3f4f6', alignItems: 'center', justifyContent: 'center', marginBottom: 8 },
   emptyTitle: { fontSize: 15, fontWeight: '700', color: '#374151' },
   emptyDesc: { fontSize: 12, color: '#9ca3af', marginTop: 4 },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: '#e5e7eb' },
