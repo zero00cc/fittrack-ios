@@ -482,10 +482,10 @@ export default function WorkoutHistoryScreen() {
           </TouchableOpacity>
         ) : (
           <View style={s.prLogCard}>
-            {prLog.map((pr, idx) => (
+            {prLog.slice(0, 5).map((pr, idx) => (
               <TouchableOpacity
                 key={pr.id}
-                style={[s.prRow, idx < prLog.length - 1 && s.prRowBorder]}
+                style={[s.prRow, idx < Math.min(prLog.length, 5) - 1 && s.prRowBorder]}
                 onPress={() => openEdit(pr)}
                 activeOpacity={0.7}
               >
