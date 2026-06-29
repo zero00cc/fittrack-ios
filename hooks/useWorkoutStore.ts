@@ -276,6 +276,15 @@ export function useWorkoutStore() {
     [setWorkoutState],
   );
 
+  const deleteCompletedPlan = useCallback(
+    (recordId: string) =>
+      setWorkoutState((prev) => ({
+        ...prev,
+        planHistory: (prev.planHistory ?? []).filter((p) => p.id !== recordId),
+      })),
+    [setWorkoutState],
+  );
+
   const recordPR = useCallback(
     (pr: PersonalRecord) =>
       setWorkoutState((prev) => ({
@@ -318,6 +327,7 @@ export function useWorkoutStore() {
     resetDayExercises,
     resetPlan,
     recordCompletedPlan,
+    deleteCompletedPlan,
     recordPR,
     updatePR,
     deletePR,

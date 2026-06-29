@@ -1,13 +1,16 @@
 import { useMemo, useRef, useEffect, useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Modal, TextInput, StyleSheet } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Modal, TextInput, StyleSheet, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useWorkoutStore } from '../hooks/useWorkoutStore';
 import { PersonalRecord } from '../types/workout.types';
-import { isoToDisplay, todayYMD, getLast90Days, getLast30Days, formatShortDate } from '../utils/dateUtils';
+import { isoToDisplay, todayYMD, getLast30Days, formatShortDate } from '../utils/dateUtils';
 import { generateId } from '../utils/calorieUtils';
+import { workoutPlans } from '../data/workoutPlans';
 import {
   BG, CARD, BORDER, TEXT, MUTED, DIM, ACCENT, ACCENT_MID, SERIF,
 } from '../constants/theme';
+
+type WorkoutDetailEntry = { planName: string; dayLabel: string; status: 'done' | 'skipped' };
 
 const SQUAT_C = '#ef4444';
 const BENCH_C = '#3b82f6';
@@ -22,13 +25,16 @@ const MONTHS = ['January','February','March','April','May','June','July','August
 function ActivityCalendar({
   workoutDates,
   prDates,
+  workoutDetails,
 }: {
   workoutDates: Record<string, 'done' | 'skipped'>;
   prDates: Set<string>;
+  workoutDetails: Record<string, WorkoutDetailEntry[]>;
 }) {
   const today = todayYMD();
-  const [year, setYear]   = useState(() => parseInt(today.slice(0, 4), 10));
-  const [month, setMonth] = useState(() => parseInt(today.slice(5, 7), 10) - 1);
+  const [year, setYear]     = useState(() => parseInt(today.slice(0, 4), 10));
+  const [month, setMonth]   = useState(() => parseInt(today.slice(5, 7), 10) - 1);
+  const [popupDate, setPopupDate] = useState<string | null>(null);
 
   const firstDow    = new Date(year, month, 1).getDay();
   const daysInMonth = new Date(year, month + 1, 0).getDate();
@@ -71,21 +77,28 @@ function ActivityCalendar({
         <View key={ri} style={cal.row}>
           {row.map((day, ci) => {
             if (!day) return <View key={ci} style={cal.cell} />;
-            const dateYMD = `${year}-${pad(month + 1)}-${pad(day)}`;
-            const isToday = dateYMD === today;
-            const status  = workoutDates[dateYMD];
-            const hasPR   = prDates.has(dateYMD);
+            const dateYMD   = `${year}-${pad(month + 1)}-${pad(day)}`;
+            const isToday   = dateYMD === today;
+            const status    = workoutDates[dateYMD];
+            const hasPR     = prDates.has(dateYMD);
+            const tappable  = !!status || hasPR;
 
             const bg = status === 'done' ? '#10b981' : status === 'skipped' ? '#f59e0b' : 'transparent';
             const fg = status ? '#fff' : isToday ? '#6366f1' : TEXT;
 
             return (
-              <View key={dateYMD} style={cal.cell}>
+              <TouchableOpacity
+                key={dateYMD}
+                style={cal.cell}
+                onPress={tappable ? () => setPopupDate(dateYMD) : undefined}
+                disabled={!tappable}
+                activeOpacity={0.65}
+              >
                 <View style={[cal.circle, { backgroundColor: bg }, isToday && !status && cal.circleToday]}>
                   <Text style={[cal.dayNum, { color: fg }]}>{day}</Text>
                 </View>
                 {hasPR && <View style={cal.prStar} />}
-              </View>
+              </TouchableOpacity>
             );
           })}
         </View>
@@ -104,6 +117,42 @@ function ActivityCalendar({
           </View>
         ))}
       </View>
+
+      {/* Day detail popup */}
+      {popupDate && (
+        <Modal visible transparent animationType="fade">
+          <TouchableOpacity
+            style={cal.popupOverlay}
+            activeOpacity={1}
+            onPress={() => setPopupDate(null)}
+          >
+            <View style={cal.popupCard} onStartShouldSetResponder={() => true}>
+              <Text style={cal.popupDateTitle}>{isoToDisplay(popupDate)}</Text>
+              {(workoutDetails[popupDate] ?? []).map((entry, i) => (
+                <View key={i} style={cal.popupRow}>
+                  <View style={[cal.popupDot, { backgroundColor: entry.status === 'done' ? '#10b981' : '#f59e0b' }]} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={cal.popupPlan}>{entry.planName}</Text>
+                    <Text style={cal.popupDay} numberOfLines={1}>{entry.dayLabel}</Text>
+                  </View>
+                  <Text style={[cal.popupStatus, { color: entry.status === 'done' ? '#10b981' : '#f59e0b' }]}>
+                    {entry.status === 'done' ? '✓ Done' : '– Skipped'}
+                  </Text>
+                </View>
+              ))}
+              {prDates.has(popupDate) && (
+                <View style={cal.popupRow}>
+                  <View style={[cal.popupDot, { backgroundColor: ACCENT }]} />
+                  <Text style={[cal.popupPlan, { color: ACCENT }]}>PR Logged</Text>
+                </View>
+              )}
+              <TouchableOpacity style={cal.popupDismiss} onPress={() => setPopupDate(null)}>
+                <Text style={cal.popupDismissTxt}>Close</Text>
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
+        </Modal>
+      )}
     </View>
   );
 }
@@ -125,14 +174,25 @@ const cal = StyleSheet.create({
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   legendDot:  { width: 7, height: 7, borderRadius: 3.5 },
   legendLabel:{ fontSize: 10, color: MUTED },
+  // Day popup
+  popupOverlay:    { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', alignItems: 'center', padding: 32 },
+  popupCard:       { width: '100%', backgroundColor: BG, borderRadius: 18, padding: 18, gap: 10 },
+  popupDateTitle:  { fontSize: 15, fontWeight: '800', color: TEXT, fontFamily: SERIF, marginBottom: 2 },
+  popupRow:        { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 6, borderTopWidth: 1, borderTopColor: BORDER },
+  popupDot:        { width: 9, height: 9, borderRadius: 4.5, flexShrink: 0 },
+  popupPlan:       { fontSize: 13, fontWeight: '700', color: TEXT },
+  popupDay:        { fontSize: 11, color: MUTED, marginTop: 1 },
+  popupStatus:     { fontSize: 12, fontWeight: '700', flexShrink: 0 },
+  popupDismiss:    { alignSelf: 'center', paddingVertical: 6, marginTop: 2 },
+  popupDismissTxt: { fontSize: 13, color: MUTED, fontWeight: '600' },
 });
 
 // ── PR Line Chart ─────────────────────────────────────────────────────────────
 
 const CHART_H = 130;
 const Y_W     = 40;
-const X_H     = 22;
-const W_SLOT  = 16;
+const X_H     = 28;
+const W_SLOT  = 52;
 
 function LineSeg({ x1, y1, x2, y2, color }: { x1: number; y1: number; x2: number; y2: number; color: string }) {
   const dx  = x2 - x1; const dy = y2 - y1;
@@ -150,41 +210,38 @@ function LineSeg({ x1, y1, x2, y2, color }: { x1: number; y1: number; x2: number
 
 function PRChart({ prLog }: { prLog: PersonalRecord[] }) {
   const scrollRef = useRef<ScrollView>(null);
-  useEffect(() => { scrollRef.current?.scrollToEnd({ animated: false }); }, []);
+  useEffect(() => { scrollRef.current?.scrollToEnd({ animated: false }); }, [prLog.length]);
 
-  const days = getLast90Days();
-
-  // Latest entry per date
-  const dateMap: Record<string, PersonalRecord> = {};
-  for (const pr of [...prLog].reverse()) dateMap[pr.date] = pr;
-
-  const sqVals  = days.map(d => dateMap[d]?.squat    ?? null);
-  const bpVals  = days.map(d => dateMap[d]?.bench    ?? null);
-  const dlVals  = days.map(d => dateMap[d]?.deadlift ?? null);
-  const all     = [...sqVals, ...bpVals, ...dlVals].filter((v): v is number => v !== null);
-
-  if (all.length === 0) {
-    return (
-      <View style={ch.wrap}>
-        <Text style={ch.title}>Personal Records</Text>
-        <View style={{ alignItems: 'center', paddingVertical: 24 }}>
-          <Text style={{ fontSize: 13, color: MUTED }}>No PRs logged yet.</Text>
-          <Text style={{ fontSize: 11, color: DIM, marginTop: 4 }}>Log your lifts when starting a plan.</Text>
-        </View>
+  const empty = (
+    <View style={ch.wrap}>
+      <Text style={ch.title}>Personal Records</Text>
+      <View style={{ alignItems: 'center', paddingVertical: 24 }}>
+        <Text style={{ fontSize: 13, color: MUTED }}>No PRs logged yet.</Text>
+        <Text style={{ fontSize: 11, color: DIM, marginTop: 4 }}>Log your lifts when starting a plan.</Text>
       </View>
-    );
-  }
+    </View>
+  );
 
-  const lo  = Math.max(0, Math.min(...all) - 5);
-  const hi  = Math.max(...all) + 5;
+  if (prLog.length === 0) return empty;
+
+  // Use log entries sorted by date as data points
+  const sorted = [...prLog].sort((a, b) => a.date.localeCompare(b.date));
+  const sqVals = sorted.map(p => p.squat);
+  const bpVals = sorted.map(p => p.bench);
+  const dlVals = sorted.map(p => p.deadlift);
+  const all    = [...sqVals, ...bpVals, ...dlVals].filter((v): v is number => v !== null);
+
+  if (all.length === 0) return empty;
+
+  const lo  = Math.max(0, Math.min(...all) - 10);
+  const hi  = Math.max(...all) + 10;
   const rng = Math.max(hi - lo, 1);
   const toY = (v: number) => CHART_H - ((v - lo) / rng) * CHART_H;
 
   function buildPts(vals: (number | null)[]) {
-    return days.map((d, i) => {
-      const v = vals[i];
-      return v !== null ? { x: i * W_SLOT + W_SLOT / 2, y: toY(v), v } : null;
-    });
+    return vals.map((v, i) =>
+      v !== null ? { x: i * W_SLOT + W_SLOT / 2, y: toY(v), v } : null,
+    );
   }
 
   function renderSeries(pts: ReturnType<typeof buildPts>, color: string) {
@@ -196,30 +253,28 @@ function PRChart({ prLog }: { prLog: PersonalRecord[] }) {
           if (!next) return null;
           return <LineSeg key={`l${i}`} x1={pt.x} y1={pt.y} x2={next.x} y2={next.y} color={color} />;
         })}
-        {pts.map((pt, i) => {
-          if (!pt) return null;
-          return (
-            <View key={`d${i}`} style={{
-              position: 'absolute', width: 7, height: 7, borderRadius: 3.5,
-              backgroundColor: color, top: pt.y - 3.5, left: pt.x - 3.5,
-            }} />
-          );
-        })}
+        {pts.map((pt, i) => pt ? (
+          <View key={`d${i}`} style={{
+            position: 'absolute', width: 8, height: 8, borderRadius: 4,
+            backgroundColor: color, top: pt.y - 4, left: pt.x - 4,
+            borderWidth: 1.5, borderColor: BG,
+          }} />
+        ) : null)}
       </>
     );
   }
 
   // Y-axis ticks
   const roughStep = (hi - lo) / 4;
-  const mag   = Math.pow(10, Math.floor(Math.log10(Math.max(roughStep, 1))));
-  const step  = Math.ceil(roughStep / mag) * mag;
-  const first = Math.ceil(lo / step) * step;
+  const mag    = Math.pow(10, Math.floor(Math.log10(Math.max(roughStep, 1))));
+  const step   = Math.ceil(roughStep / mag) * mag;
+  const first  = Math.ceil(lo / step) * step;
   const yTicks = Array.from({ length: Math.ceil((hi - first) / step) + 1 }, (_, i) => first + i * step)
     .filter(t => t >= lo && t <= hi);
 
   return (
     <View style={ch.wrap}>
-      <Text style={ch.title}>Personal Records — 90 days</Text>
+      <Text style={ch.title}>Personal Records</Text>
       <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
         {/* Y axis */}
         <View style={{ width: Y_W }}>
@@ -237,19 +292,19 @@ function PRChart({ prLog }: { prLog: PersonalRecord[] }) {
         </View>
         {/* Chart area */}
         <ScrollView ref={scrollRef} horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1 }}>
-          <View style={{ width: days.length * W_SLOT, height: CHART_H + X_H }}>
+          <View style={{ width: sorted.length * W_SLOT, height: CHART_H + X_H }}>
             <View style={{ height: CHART_H, position: 'relative' }}>
               {renderSeries(buildPts(sqVals), SQUAT_C)}
               {renderSeries(buildPts(bpVals), BENCH_C)}
               {renderSeries(buildPts(dlVals), DL_C)}
             </View>
+            {/* X-axis: one label per log entry */}
             <View style={{ height: X_H, flexDirection: 'row', borderTopWidth: 1, borderTopColor: BORDER }}>
-              {days.map((d, i) => {
-                if (i % 15 !== 0) return null;
-                const dt  = new Date(d + 'T00:00:00');
+              {sorted.map((pr, i) => {
+                const dt  = new Date(pr.date + 'T00:00:00');
                 const lbl = `${dt.toLocaleDateString('en-US', { month: 'short' })} ${dt.getDate()}`;
                 return (
-                  <View key={d} style={{ width: W_SLOT * 15, justifyContent: 'center' }}>
+                  <View key={pr.id} style={{ width: W_SLOT, alignItems: 'center', justifyContent: 'center' }}>
                     <Text style={{ fontSize: 9, color: MUTED, fontWeight: '600' }}>{lbl}</Text>
                   </View>
                 );
@@ -290,7 +345,7 @@ const STATUS_LABELS = { finished: '✓ Done', skipped: '– Skipped', unfinished
 const LEVEL_LABELS  = { beginner: 'Beginner', intermediate: 'Intermediate', professional: 'Professional', personalized: 'Custom' };
 
 export default function WorkoutHistoryScreen() {
-  const { workoutState, recordPR, updatePR, deletePR } = useWorkoutStore();
+  const { workoutState, recordPR, updatePR, deletePR, deleteCompletedPlan } = useWorkoutStore();
 
   const prLog = workoutState.prLog ?? [];
 
@@ -341,29 +396,65 @@ export default function WorkoutHistoryScreen() {
     closeEdit();
   }
 
-  // Build activity date map from all plan history + current progress
-  const workoutDates = useMemo<Record<string, 'done' | 'skipped'>>(() => {
-    const map: Record<string, 'done' | 'skipped'> = {};
+  // Build activity date map and per-date detail entries from all plan history + current progress
+  const { workoutDates, workoutDetails } = useMemo<{
+    workoutDates: Record<string, 'done' | 'skipped'>;
+    workoutDetails: Record<string, WorkoutDetailEntry[]>;
+  }>(() => {
+    const dates: Record<string, 'done' | 'skipped'> = {};
+    const details: Record<string, WorkoutDetailEntry[]> = {};
+
+    function addEntry(dateYMD: string, entry: WorkoutDetailEntry) {
+      dates[dateYMD] = entry.status;
+      if (!details[dateYMD]) details[dateYMD] = [];
+      details[dateYMD].push(entry);
+    }
+
     for (const plan of workoutState.planHistory ?? []) {
       for (const dr of plan.dayResults) {
         if (dr.completionDate && dr.status !== 'unfinished') {
-          map[dr.completionDate] = dr.status === 'finished' ? 'done' : 'skipped';
+          addEntry(dr.completionDate, {
+            planName: plan.planName,
+            dayLabel: dr.label,
+            status: dr.status === 'finished' ? 'done' : 'skipped',
+          });
         }
       }
     }
-    if (workoutState.progress?.completionDates) {
+
+    if (workoutState.progress?.completionDates && workoutState.activePlanId) {
+      const activePlan = workoutPlans.find(p => p.id === workoutState.activePlanId)
+        ?? (workoutState.personalizedPlans ?? []).find(p => p.id === workoutState.activePlanId);
       for (const [dn, date] of Object.entries(workoutState.progress.completionDates)) {
-        const st = workoutState.progress.dayStatus[parseInt(dn, 10)];
-        map[date] = st === 'skipped' ? 'skipped' : 'done';
+        const dayNum  = parseInt(dn, 10);
+        const st      = workoutState.progress.dayStatus[dayNum];
+        const day     = activePlan?.days.find(d => d.dayNumber === dayNum);
+        addEntry(date, {
+          planName: activePlan?.name ?? 'Current Plan',
+          dayLabel: day?.label ?? `Day ${dayNum}`,
+          status: st === 'skipped' ? 'skipped' : 'done',
+        });
       }
     }
-    return map;
-  }, [workoutState.planHistory, workoutState.progress]);
+
+    return { workoutDates: dates, workoutDetails: details };
+  }, [workoutState.planHistory, workoutState.progress, workoutState.activePlanId, workoutState.personalizedPlans]);
 
   // Dates where a PR was logged
   const prDates = useMemo(() => new Set(prLog.map(p => p.date)), [prLog]);
 
   const history = workoutState.planHistory ?? [];
+
+  function confirmDeletePlan(recordId: string, planName: string) {
+    Alert.alert(
+      'Remove Plan',
+      `Remove "${planName}" from your history? This cannot be undone.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Remove', style: 'destructive', onPress: () => deleteCompletedPlan(recordId) },
+      ],
+    );
+  }
 
   return (
     <SafeAreaView style={s.safe} edges={['bottom']}>
@@ -371,7 +462,7 @@ export default function WorkoutHistoryScreen() {
 
         {/* Activity Calendar */}
         <Text style={s.sectionHeader}>Workout Activity</Text>
-        <ActivityCalendar workoutDates={workoutDates} prDates={prDates} />
+        <ActivityCalendar workoutDates={workoutDates} prDates={prDates} workoutDetails={workoutDetails} />
 
         {/* PR Chart */}
         <Text style={s.sectionHeader}>Strength Progress</Text>
@@ -508,6 +599,13 @@ export default function WorkoutHistoryScreen() {
                     <Text style={s.planBadgeNum}>{pct}%</Text>
                     <Text style={s.planBadgeLbl}>done</Text>
                   </View>
+                  <TouchableOpacity
+                    style={s.planRemoveBtn}
+                    onPress={() => confirmDeletePlan(record.id, record.planName)}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    <Text style={s.planRemoveTxt}>✕</Text>
+                  </TouchableOpacity>
                 </View>
                 {/* Progress bar */}
                 <View style={s.planBar}>
@@ -577,7 +675,9 @@ const s = StyleSheet.create({
 
   // Completed plan cards
   planCard:       { backgroundColor: CARD, borderRadius: 14, padding: 14, borderWidth: 1, borderColor: BORDER, gap: 10 },
-  planCardHeader: { flexDirection: 'row', alignItems: 'flex-start' },
+  planCardHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
+  planRemoveBtn:  { paddingHorizontal: 6, paddingVertical: 2, marginTop: 2 },
+  planRemoveTxt:  { fontSize: 14, color: '#ef4444', fontWeight: '700' },
   planName:       { fontSize: 14, fontWeight: '700', color: TEXT, fontFamily: SERIF },
   planLevel:      { fontSize: 10, color: MUTED, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 2 },
   planDates:      { fontSize: 11, color: DIM, marginTop: 3 },
