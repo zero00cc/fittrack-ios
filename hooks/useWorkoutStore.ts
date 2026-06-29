@@ -277,11 +277,17 @@ export function useWorkoutStore() {
   );
 
   const deleteCompletedPlan = useCallback(
-    (recordId: string) =>
-      setWorkoutState((prev) => ({
-        ...prev,
-        planHistory: (prev.planHistory ?? []).filter((p) => p.id !== recordId),
-      })),
+    (recordId: string) => {
+      let next: WorkoutState | undefined;
+      setWorkoutState((prev) => {
+        next = { ...prev, planHistory: (prev.planHistory ?? []).filter((p) => p.id !== recordId) };
+        return next;
+      });
+      // Push to Supabase immediately — don't wait for the useEffect cycle.
+      // Without this, navigating away before the effect fires leaves Supabase with
+      // stale data, which overwrites AsyncStorage when the screen re-mounts.
+      if (next) pushState(next);
+    },
     [setWorkoutState],
   );
 
