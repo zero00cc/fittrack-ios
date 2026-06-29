@@ -383,8 +383,12 @@ export default function WorkoutsScreen() {
 
   // Tap on an unlogged date in daily mode → confirm "Add?"
   function handleDailyDateTap(dateYMD: string) {
+    // A day is "taken" if it's already completed/skipped OR already scheduled in the dateMap
+    const scheduledDays = new Set(Object.values(workoutState.progress?.dateMap ?? {}));
     const nextDay = trainingDays.find(
-      (d) => (workoutState.progress?.dayStatus[d.dayNumber] ?? 'unfinished') === 'unfinished',
+      (d) =>
+        (workoutState.progress?.dayStatus[d.dayNumber] ?? 'unfinished') === 'unfinished' &&
+        !scheduledDays.has(d.dayNumber),
     );
     if (nextDay) setDailyDateConfirm({ type: 'add', dateYMD, nextDay });
   }
