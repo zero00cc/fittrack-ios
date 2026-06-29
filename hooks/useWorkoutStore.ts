@@ -292,11 +292,14 @@ export function useWorkoutStore() {
   );
 
   const recordPR = useCallback(
-    (pr: PersonalRecord) =>
-      setWorkoutState((prev) => ({
-        ...prev,
-        prLog: [pr, ...(prev.prLog ?? [])],
-      })),
+    (pr: PersonalRecord) => {
+      let next: WorkoutState | undefined;
+      setWorkoutState((prev) => {
+        next = { ...prev, prLog: [pr, ...(prev.prLog ?? [])] };
+        return next;
+      });
+      if (next) pushState(next);
+    },
     [setWorkoutState],
   );
 
