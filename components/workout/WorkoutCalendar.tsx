@@ -58,6 +58,8 @@ export function WorkoutCalendar({ progress, trainingDayNumbers, onPressDay, onPr
     }
     const dayNumber = effectiveDateMap[dateYMD];
     if (!dayNumber) return { dayNumber: null, color: null };
+    const scheduledStatus = progress.dayStatus[dayNumber];
+    if (scheduledStatus === 'skipped') return { dayNumber, color: 'orange' };
     if (dateYMD < today) return { dayNumber, color: 'red' };
     return { dayNumber, color: 'upcoming' };
   }

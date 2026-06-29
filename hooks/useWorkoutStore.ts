@@ -108,7 +108,7 @@ export function useWorkoutStore() {
       setWorkoutState((prev) => {
         if (!prev.progress) return prev;
         const completionDates = { ...(prev.progress.completionDates ?? {}) };
-        if (status === 'finished') {
+        if (status === 'finished' || status === 'skipped') {
           completionDates[dayNumber] = workoutDate ?? todayYMD();
         } else {
           delete completionDates[dayNumber];
