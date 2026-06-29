@@ -4,11 +4,13 @@ export type DayStatus = 'unfinished' | 'finished' | 'skipped';
 
 // One row in a detailed set prescription (Sets, Reps, RPE, Load).
 // null means the value is not prescribed — user fills it in.
+// intensity: % of 1RM PR (e.g. 80 for 80%); when set, load is computed at runtime from the user's latest PR.
 export interface SetBlock {
   sets: number;
   reps: number | null;
   rpe: number | null;
   load: number | null;
+  intensity?: number | null;
 }
 
 export interface Exercise {
@@ -22,6 +24,8 @@ export interface Exercise {
   setBlocks?: SetBlock[];
   youtubeUrl: string;
   notes?: string;
+  // Which PR to use when computing intensity-based loads
+  liftType?: 'squat' | 'bench' | 'deadlift';
 }
 
 export interface WorkoutDay {
@@ -63,6 +67,8 @@ export interface PlanProgress {
   dateMap?: { [dateYMD: string]: number };
   // The actual calendar date each plan day was completed (YYYY-MM-DD)
   completionDates?: { [dayNumber: number]: string };
+  // PRs entered when this plan was activated — used for intensity-based load computation
+  startPR?: { squat: number | null; bench: number | null; deadlift: number | null };
 }
 
 export interface CompletedPlanDay {

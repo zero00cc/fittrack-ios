@@ -1,5 +1,5 @@
-import { useState, useMemo } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Modal, StyleSheet, TextInput } from 'react-native';
+import { useState, useMemo, useRef } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, Modal, StyleSheet, TextInput, Animated } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -108,6 +108,7 @@ export default function WorkoutsScreen() {
     addCustomExercise,
     removeCustomExercise,
     resetDayProgress,
+    resetDayExercises,
     resetPlan,
     recordCompletedPlan,
     recordPR,
@@ -145,6 +146,31 @@ export default function WorkoutsScreen() {
   const [prSquat,          setPrSquat]          = useState('');
   const [prBench,          setPrBench]          = useState('');
   const [prDeadlift,       setPrDeadlift]       = useState('');
+  const [dayFlash,         setDayFlash]         = useState<'complete' | 'reset' | null>(null);
+  const flashAnim = useRef(new Animated.Value(0)).current;
+
+  function showFlash(type: 'complete' | 'reset') {
+    setDayFlash(type);
+    flashAnim.setValue(0);
+    Animated.sequence([
+      Animated.spring(flashAnim, { toValue: 1, useNativeDriver: true, damping: 14, stiffness: 180 }),
+      Animated.delay(600),
+      Animated.timing(flashAnim, { toValue: 0, duration: 220, useNativeDriver: true }),
+    ]).start(() => setDayFlash(null));
+  }
+
+  const latestPR = useMemo(() => {
+    // Plan-start PRs take priority — they're tied to this specific plan activation
+    const startPR = workoutState.progress?.startPR;
+    if (startPR) return startPR;
+    // Fall back to the most recent entry in prLog (newest first, no reverse needed)
+    const log = workoutState.prLog ?? [];
+    return {
+      squat:    log.find(r => r.squat    !== null)?.squat    ?? null,
+      bench:    log.find(r => r.bench    !== null)?.bench    ?? null,
+      deadlift: log.find(r => r.deadlift !== null)?.deadlift ?? null,
+    };
+  }, [workoutState.prLog, workoutState.progress?.startPR]);
 
   // These must stay above any early return to satisfy Rules of Hooks
   const dayExerciseIds = useMemo(() => {
@@ -290,11 +316,15 @@ export default function WorkoutsScreen() {
     const sq = parseFloat(prSquat)    || null;
     const bp = parseFloat(prBench)    || null;
     const dl = parseFloat(prDeadlift) || null;
-    if (sq !== null || bp !== null || dl !== null) {
+    const startPR = (sq !== null || bp !== null || dl !== null)
+      ? { squat: sq, bench: bp, deadlift: dl }
+      : undefined;
+
+    if (startPR) {
       recordPR({ id: generateId(), date: todayYMD(), squat: sq, bench: bp, deadlift: dl });
     }
 
-    activatePlan(pendingPlanId, plan.defaultWeeklySchedule, pendingMode, pendingDateMap);
+    activatePlan(pendingPlanId, plan.defaultWeeklySchedule, pendingMode, pendingDateMap, startPR);
     setPendingPlanId(null);
     setPendingMode(null);
     setPendingDateMap(undefined);
@@ -342,8 +372,9 @@ export default function WorkoutsScreen() {
         dayNumber:      d.dayNumber,
         label:          d.label,
         status:         updatedStatus[d.dayNumber] ?? 'unfinished',
-        completionDate: (justFinishedDay?.dayNumber === d.dayNumber ? justFinishedDay.date : undefined)
-                        ?? workoutState.progress!.completionDates?.[d.dayNumber],
+        completionDate: justFinishedDay?.dayNumber === d.dayNumber
+          ? (justFinishedDay.date ?? (updatedStatus[d.dayNumber] === 'finished' ? todayYMD() : undefined))
+          : workoutState.progress!.completionDates?.[d.dayNumber],
       })),
     };
     recordCompletedPlan(record); // persist to AsyncStorage + Supabase immediately
@@ -388,9 +419,10 @@ export default function WorkoutsScreen() {
     const allDone = effectiveExercises.every((ex) => isExerciseDone(ex, updated));
     const currentStatus: DayStatus = workoutState.progress?.dayStatus[dayNumber] ?? 'unfinished';
     if (allDone) {
-      updateDayStatus(dayNumber, 'finished', selectedWorkoutDate ?? undefined);
+      const completionDate = selectedWorkoutDate ?? todayYMD();
+      updateDayStatus(dayNumber, 'finished', completionDate);
       const newStatus = { ...(workoutState.progress?.dayStatus ?? {}), [dayNumber]: 'finished' as DayStatus };
-      checkPlanCompletion(newStatus, { dayNumber, date: selectedWorkoutDate ?? undefined });
+      checkPlanCompletion(newStatus, { dayNumber, date: completionDate });
     } else if (currentStatus === 'finished') {
       updateDayStatus(dayNumber, 'unfinished');
     }
@@ -828,12 +860,7 @@ export default function WorkoutsScreen() {
     );
   }
 
-  // ── Plan history — redirect to dedicated screen ────────────────
-  if (view === 'history') {
-    router.push('/workout-history' as any);
-    setView('level');
-    return null;
-  }
+  // view === 'history' is handled inline in the button handlers below
 
   // ── Active plan detail ──────────────────────────────────────────
   return (
@@ -957,6 +984,7 @@ export default function WorkoutsScreen() {
                     onUpdateBlock={(blockIndex, n) => handleDayBlockUpdate(selectedDay.dayNumber, ex.id, blockIndex, n)}
                     onEditSetBlocks={(newBlocks) => updateExerciseSetBlocks(selectedDay.dayNumber, ex.id, newBlocks)}
                     onRemove={isCustom ? () => removeCustomExercise(selectedDay.dayNumber, ex.id) : undefined}
+                    latestPR={latestPR}
                   />
                 );
               })}
@@ -971,18 +999,26 @@ export default function WorkoutsScreen() {
                 style={styles.completeBtn}
                 onPress={() => {
                   const dn = selectedDay.dayNumber;
-                  updateDayStatus(dn, 'finished', selectedWorkoutDate ?? undefined);
+                  const completionDate = selectedWorkoutDate ?? todayYMD();
+                  showFlash('complete');
+                  updateDayStatus(dn, 'finished', completionDate);
                   setSelectedDay(null); setSelectedWorkoutDate(null); setShowStopwatch(false);
                   setPendingDayDates((prev) => { const n = { ...prev }; delete n[dn]; return n; });
                   const newStatus = { ...(workoutState.progress?.dayStatus ?? {}), [dn]: 'finished' as DayStatus };
-                  checkPlanCompletion(newStatus, { dayNumber: dn, date: selectedWorkoutDate ?? undefined });
+                  checkPlanCompletion(newStatus, { dayNumber: dn, date: completionDate });
                 }}
               >
                 <Text style={styles.completeBtnText}>✓ Mark as Completed</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.resetDayBtn}
-                onPress={() => { const dn = selectedDay.dayNumber; updateDayStatus(dn, 'unfinished'); setSelectedDay(null); setSelectedWorkoutDate(null); setPendingDayDates((prev) => { const n = { ...prev }; delete n[dn]; return n; }); }}
+                onPress={() => {
+                  const dn = selectedDay.dayNumber;
+                  showFlash('reset');
+                  resetDayExercises(dn);
+                  setSelectedDay(null); setSelectedWorkoutDate(null);
+                  setPendingDayDates((prev) => { const n = { ...prev }; delete n[dn]; return n; });
+                }}
               >
                 <Text style={styles.resetDayBtnText}>Reset Day</Text>
               </TouchableOpacity>
@@ -1117,7 +1153,9 @@ export default function WorkoutsScreen() {
         <Modal visible transparent animationType="fade">
           <View style={styles.celebrationOverlay}>
             <View style={styles.celebrationCard}>
-              <Text style={styles.celebrationEmoji}>🎉</Text>
+              <View style={styles.celebrationIconWrap}>
+                <Ionicons name="trophy" size={60} color="#f59e0b" />
+              </View>
               <Text style={styles.celebrationTitle}>Plan Complete!</Text>
               <Text style={styles.celebrationPlan}>{completedRecord.planName}</Text>
               <View style={styles.celebrationStats}>
@@ -1148,7 +1186,8 @@ export default function WorkoutsScreen() {
                 style={styles.celebrationSecondary}
                 onPress={() => {
                   setCompletedRecord(null);
-                  setView('history');
+                  setView('level');
+                  router.push('/workout-history' as any);
                 }}
               >
                 <Text style={styles.celebrationSecondaryText}>View History</Text>
@@ -1259,6 +1298,38 @@ export default function WorkoutsScreen() {
               )}
             </View>
           </TouchableOpacity>
+        </Modal>
+      )}
+      {/* ── Day action flash feedback ── */}
+      {dayFlash && (
+        <Modal visible transparent animationType="none">
+          <View style={styles.flashOverlay} pointerEvents="none">
+            <Animated.View style={[
+              styles.flashCard,
+              {
+                opacity: flashAnim,
+                transform: [{ scale: flashAnim.interpolate({ inputRange: [0, 1], outputRange: [0.65, 1] }) }],
+              },
+            ]}>
+              {dayFlash === 'complete' ? (
+                <>
+                  <View style={[styles.flashIconWrap, { backgroundColor: '#dcfce7' }]}>
+                    <Ionicons name="checkmark-circle" size={52} color="#10b981" />
+                  </View>
+                  <Text style={styles.flashTitle}>Day Completed!</Text>
+                  <Text style={styles.flashSub}>Great work, keep it up.</Text>
+                </>
+              ) : (
+                <>
+                  <View style={[styles.flashIconWrap, { backgroundColor: '#fef9c3' }]}>
+                    <Ionicons name="refresh-circle" size={52} color="#f59e0b" />
+                  </View>
+                  <Text style={styles.flashTitle}>Day Reset</Text>
+                  <Text style={styles.flashSub}>Progress cleared for this day.</Text>
+                </>
+              )}
+            </Animated.View>
+          </View>
         </Modal>
       )}
     </SafeAreaView>
@@ -1412,7 +1483,7 @@ const styles = StyleSheet.create({
   // Celebration modal
   celebrationOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center', padding: 32 },
   celebrationCard: { width: '100%', backgroundColor: '#fff', borderRadius: 24, padding: 28, alignItems: 'center', gap: 8 },
-  celebrationEmoji: { fontSize: 56 },
+  celebrationIconWrap: { width: 100, height: 100, borderRadius: 28, backgroundColor: '#fef9c3', alignItems: 'center', justifyContent: 'center' },
   celebrationTitle: { fontSize: 24, fontWeight: '800', color: '#111827' },
   celebrationPlan: { fontSize: 15, color: '#6b7280', textAlign: 'center' },
   celebrationStats: { flexDirection: 'row', gap: 24, marginVertical: 8 },
@@ -1474,4 +1545,10 @@ const styles = StyleSheet.create({
   editDayChevron:  { fontSize: 20, color: '#d1d5db', marginLeft: 8 },
   saveBtn:         { backgroundColor: '#10b981', borderRadius: 14, paddingVertical: 15, alignItems: 'center', marginTop: 8 },
   saveBtnText:     { color: '#fff', fontWeight: '700', fontSize: 15 },
+  // Day flash feedback
+  flashOverlay:  { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.25)' },
+  flashCard:     { backgroundColor: '#fff', borderRadius: 28, paddingHorizontal: 40, paddingVertical: 32, alignItems: 'center', gap: 10, shadowColor: '#000', shadowOpacity: 0.18, shadowRadius: 24, shadowOffset: { width: 0, height: 10 } },
+  flashIconWrap: { width: 88, height: 88, borderRadius: 44, alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
+  flashTitle:    { fontSize: 22, fontWeight: '800', color: '#111827' },
+  flashSub:      { fontSize: 13, color: '#9ca3af', fontWeight: '500' },
 });

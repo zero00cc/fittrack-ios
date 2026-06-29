@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { useAsyncStorage } from './useAsyncStorage';
-import { WorkoutState, TrainingLevel, DayStatus, SetBlock, Exercise, PlanMode, CompletedPlan, PersonalRecord } from '../types/workout.types';
+import { WorkoutState, TrainingLevel, DayStatus, SetBlock, Exercise, PlanMode, CompletedPlan, PersonalRecord, WorkoutPlan } from '../types/workout.types';
 import { todayYMD } from '../utils/dateUtils';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
@@ -85,11 +85,20 @@ export function useWorkoutStore() {
   );
 
   const activatePlan = useCallback(
-    (planId: string, weeklySchedule: number[], mode: PlanMode, dateMap?: { [dateYMD: string]: number }) =>
+    (
+      planId: string,
+      weeklySchedule: number[],
+      mode: PlanMode,
+      dateMap?: { [dateYMD: string]: number },
+      startPR?: { squat: number | null; bench: number | null; deadlift: number | null },
+    ) =>
       setWorkoutState((prev) => ({
         ...prev,
         activePlanId: planId,
-        progress: { planId, startDate: todayYMD(), mode, dayStatus: {}, weeklySchedule, dateMap },
+        progress: {
+          planId, startDate: todayYMD(), mode, dayStatus: {}, weeklySchedule, dateMap,
+          ...(startPR ? { startPR } : {}),
+        },
       })),
     [setWorkoutState],
   );
@@ -208,6 +217,25 @@ export function useWorkoutStore() {
     [setWorkoutState],
   );
 
+  // Clears status + set counts for a day but keeps its scheduled date in dateMap
+  const resetDayExercises = useCallback(
+    (dayNumber: number) =>
+      setWorkoutState((prev) => {
+        if (!prev.progress) return prev;
+        const dayStatus       = { ...prev.progress.dayStatus };
+        const completionDates = { ...(prev.progress.completionDates ?? {}) };
+        const setProgress     = { ...(prev.progress.setProgress ?? {}) };
+        delete dayStatus[dayNumber];
+        delete completionDates[dayNumber];
+        delete setProgress[dayNumber];
+        return {
+          ...prev,
+          progress: { ...prev.progress, dayStatus, completionDates, setProgress },
+        };
+      }),
+    [setWorkoutState],
+  );
+
   const resetPlan = useCallback(
     () => setWorkoutState((prev) => ({ ...prev, activePlanId: null, progress: null })),
     [setWorkoutState],
@@ -287,6 +315,7 @@ export function useWorkoutStore() {
     addCustomExercise,
     removeCustomExercise,
     resetDayProgress,
+    resetDayExercises,
     resetPlan,
     recordCompletedPlan,
     recordPR,
