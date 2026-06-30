@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, Modal,
-  StyleSheet, TextInput,
+  StyleSheet, TextInput, ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useCalorieStore } from '../hooks/useCalorieStore';
@@ -450,14 +450,66 @@ const ee = StyleSheet.create({
   saveTxt:    { color: BG, fontWeight: '700', fontSize: 15 },
 });
 
+interface FoodResult {
+  name: string; kcal100g: number; protein100g: number; carbs100g: number; fat100g: number;
+}
+
 function AddEntryForm({ date, onAdd, onClose }: {
   date: string; onAdd: (e: MacroEntry) => void; onClose: () => void;
 }) {
-  const [name, setName] = useState('');
-  const [cal,  setCal]  = useState('');
-  const [pro,  setPro]  = useState('0');
-  const [carb, setCarb] = useState('0');
-  const [fat,  setFat]  = useState('0');
+  const [name,          setName]          = useState('');
+  const [cal,           setCal]           = useState('');
+  const [pro,           setPro]           = useState('0');
+  const [carb,          setCarb]          = useState('0');
+  const [fat,           setFat]           = useState('0');
+  const [searchResults, setSearchResults] = useState<FoodResult[]>([]);
+  const [searching,     setSearching]     = useState(false);
+  const [showDropdown,  setShowDropdown]  = useState(false);
+  const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const blurTimer   = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (searchTimer.current) clearTimeout(searchTimer.current);
+    if (name.trim().length < 2) { setSearchResults([]); setShowDropdown(false); return; }
+    searchTimer.current = setTimeout(async () => {
+      setSearching(true);
+      try {
+        const res  = await fetch(
+          `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(name.trim())}&search_simple=1&action=process&json=1&page_size=6&fields=product_name,nutriments`,
+        );
+        const data = await res.json();
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const results: FoodResult[] = (data.products ?? [])
+          .filter((p: any) => p.product_name && p.nutriments?.['energy-kcal_100g'] != null)
+          .slice(0, 5)
+          .map((p: any) => ({
+            name: p.product_name as string,
+            kcal100g:    Math.round(p.nutriments['energy-kcal_100g']),
+            protein100g: Math.round(p.nutriments['proteins_100g']      ?? 0),
+            carbs100g:   Math.round(p.nutriments['carbohydrates_100g'] ?? 0),
+            fat100g:     Math.round(p.nutriments['fat_100g']           ?? 0),
+          }));
+        setSearchResults(results);
+        setShowDropdown(results.length > 0);
+      } catch {
+        setSearchResults([]); setShowDropdown(false);
+      } finally {
+        setSearching(false);
+      }
+    }, 400);
+    return () => { if (searchTimer.current) clearTimeout(searchTimer.current); };
+  }, [name]);
+
+  function selectFood(item: FoodResult) {
+    if (blurTimer.current) clearTimeout(blurTimer.current);
+    setName(item.name);
+    setCal(String(item.kcal100g));
+    setPro(String(item.protein100g));
+    setCarb(String(item.carbs100g));
+    setFat(String(item.fat100g));
+    setShowDropdown(false);
+    setSearchResults([]);
+  }
 
   function submit() {
     const calories = parseInt(cal);
@@ -472,7 +524,38 @@ function AddEntryForm({ date, onAdd, onClose }: {
         <Text style={af.title}>Add Entry</Text>
         <TouchableOpacity onPress={onClose}><Text style={af.close}>×</Text></TouchableOpacity>
       </View>
-      <TextInput style={af.nameInput} value={name} onChangeText={setName} placeholder="Food name" placeholderTextColor={DIM} autoFocus />
+
+      <View style={af.searchWrap}>
+        <View style={af.nameRow}>
+          <TextInput
+            style={af.nameInput}
+            value={name}
+            onChangeText={setName}
+            placeholder="Food name"
+            placeholderTextColor={DIM}
+            autoFocus
+            onBlur={() => { blurTimer.current = setTimeout(() => setShowDropdown(false), 200); }}
+            onFocus={() => { if (blurTimer.current) clearTimeout(blurTimer.current); if (searchResults.length > 0) setShowDropdown(true); }}
+          />
+          {searching && <ActivityIndicator style={af.spinner} size="small" color={ACCENT} />}
+        </View>
+        {showDropdown && (
+          <View style={af.dropdown}>
+            {searchResults.map((item, idx) => (
+              <TouchableOpacity
+                key={idx}
+                style={[af.dropItem, idx < searchResults.length - 1 && af.dropBorder]}
+                onPress={() => selectFood(item)}
+                activeOpacity={0.7}
+              >
+                <Text style={af.dropName} numberOfLines={1}>{item.name}</Text>
+                <Text style={af.dropKcal}>{item.kcal100g} kcal/100g</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
+      </View>
+
       <View style={af.row}>
         {([['Kcal',cal,setCal,true],['Protein',pro,setPro,false],['Carbs',carb,setCarb,false],['Fat',fat,setFat,false]] as [string,string,(v:string)=>void,boolean][]).map(([l,v,sv,req]) => (
           <View key={l} style={af.field}>
@@ -488,18 +571,26 @@ function AddEntryForm({ date, onAdd, onClose }: {
   );
 }
 const af = StyleSheet.create({
-  wrap:      { gap: 10 },
-  header:    { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  title:     { fontSize: 15, fontWeight: '700', color: TEXT, fontFamily: SERIF },
-  close:     { color: MUTED, fontSize: 20, padding: 4 },
-  nameInput: { backgroundColor: CARD, color: TEXT, fontSize: 14, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, borderWidth: 1, borderColor: BORDER },
-  row:       { flexDirection: 'row', gap: 6 },
-  field:     { flex: 1, alignItems: 'center', gap: 3 },
-  fieldLbl:  { fontSize: 9, color: MUTED, fontWeight: '700', textTransform: 'uppercase' },
-  fieldInput:{ backgroundColor: CARD, color: TEXT, fontSize: 13, fontWeight: '700', borderRadius: 6, paddingVertical: 8, width: '100%', textAlign: 'center', borderWidth: 1, borderColor: BORDER },
-  btn:       { backgroundColor: ACCENT, borderRadius: 9, paddingVertical: 12, alignItems: 'center' },
-  btnOff:    { backgroundColor: CARD },
-  btnTxt:    { color: BG, fontWeight: '700', fontSize: 14 },
+  wrap:       { gap: 10 },
+  header:     { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  title:      { fontSize: 15, fontWeight: '700', color: TEXT, fontFamily: SERIF },
+  close:      { color: MUTED, fontSize: 20, padding: 4 },
+  searchWrap: { zIndex: 20 },
+  nameRow:    { flexDirection: 'row', alignItems: 'center' },
+  nameInput:  { flex: 1, backgroundColor: CARD, color: TEXT, fontSize: 14, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, borderWidth: 1, borderColor: BORDER },
+  spinner:    { position: 'absolute', right: 10 },
+  dropdown:   { backgroundColor: CARD, borderRadius: 9, borderWidth: 1, borderColor: BORDER, marginTop: 3, overflow: 'hidden', elevation: 4, shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 6, shadowOffset: { width: 0, height: 2 } },
+  dropItem:   { paddingHorizontal: 12, paddingVertical: 10, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  dropBorder: { borderBottomWidth: 1, borderBottomColor: BORDER },
+  dropName:   { fontSize: 13, fontWeight: '600', color: TEXT, flex: 1, marginRight: 6 },
+  dropKcal:   { fontSize: 11, fontWeight: '700', color: ACCENT, flexShrink: 0 },
+  row:        { flexDirection: 'row', gap: 6 },
+  field:      { flex: 1, alignItems: 'center', gap: 3 },
+  fieldLbl:   { fontSize: 9, color: MUTED, fontWeight: '700', textTransform: 'uppercase' },
+  fieldInput: { backgroundColor: CARD, color: TEXT, fontSize: 13, fontWeight: '700', borderRadius: 6, paddingVertical: 8, width: '100%', textAlign: 'center', borderWidth: 1, borderColor: BORDER },
+  btn:        { backgroundColor: ACCENT, borderRadius: 9, paddingVertical: 12, alignItems: 'center' },
+  btnOff:     { backgroundColor: CARD },
+  btnTxt:     { color: BG, fontWeight: '700', fontSize: 14 },
 });
 
 // ── Day choice modal ─────────────────────────────────────────────────────────
@@ -623,12 +714,12 @@ const cal = StyleSheet.create({
   dayLabels:     { flexDirection: 'row' },
   dayLabel:      { flex: 1, textAlign: 'center', fontSize: 10, color: MUTED, fontWeight: '600' },
   grid:          { flexDirection: 'row', flexWrap: 'wrap' },
-  cell:          { width: `${100 / 7}%`, aspectRatio: 1, alignItems: 'center', justifyContent: 'center', gap: 2 },
+  cell:          { width: `${100 / 7}%`, aspectRatio: 1, alignItems: 'center', justifyContent: 'center', position: 'relative', paddingBottom: 8 },
   cellToday:     { backgroundColor: CARD2, borderRadius: 7 },
   cellTxt:       { fontSize: 13, color: MUTED },
   cellTxtToday:  { color: TEXT, fontWeight: '700' },
   cellTxtFuture: { color: BORDER },
-  cellDot:       { width: 5, height: 5, borderRadius: 3 },
+  cellDot:       { width: 5, height: 5, borderRadius: 3, position: 'absolute', bottom: 3 },
 });
 
 // ── Day modal ─────────────────────────────────────────────────────────────────
@@ -649,7 +740,7 @@ function DayModal({ date, history, goals, addEntry, updateEntry, removeHistoryEn
   const color    = calorieColor(totals.calories, goals.calories);
   const label    = new Date(date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
   const daysBack = daysBetween(date, todayYMD());
-  const canAdd   = daysBack >= 0 && daysBack <= MAX_DAYS_BACK;
+  const canAdd   = daysBack >= 0;
 
   return (
     <Modal visible animationType="fade" transparent>
