@@ -53,7 +53,7 @@ void supabase.from('table').upsert({...}).then(undefined, () => {});
 
 ### Screens
 
-All tabs live in `app/(tabs)/`: `index`, `calories`, `workouts`, `exercises`, `gallery`, `ranking`.
+Active tabs in `app/(tabs)/`: `index`, `calories`, `workouts`, `exercises`, `ranking`. The `_layout.tsx` also registers a `gallery` tab but `gallery.tsx` does not yet exist — the backing hook (`useGalleryStore`), Supabase table (`gallery_items`), and Storage bucket integration are implemented but the tab screen is absent.
 
 `workouts.tsx` manages a 5-state internal view stack (`'level' | 'plans' | 'setup' | 'detail' | 'history'`) with its own modals rather than using router navigation.
 
@@ -66,6 +66,7 @@ All tabs live in `app/(tabs)/`: `index`, `calories`, `workouts`, `exercises`, `g
 | `calorie-progress.tsx` | push | Progress & History — 30-day chart and editable past logs |
 | `calorie-result.tsx` | modal | Meal details — shows AI-analyzed items from a food photo for review before saving |
 | `workout-history.tsx` | push | Completed plan history, activity calendar, and personal-record (PR) log for Squat/Bench/Deadlift |
+| `resources.tsx` | push | Fitness resources — categorised external links; navigated to from the home screen |
 
 ### Calorie onboarding & nutrition calculation
 
@@ -131,6 +132,11 @@ Pending schema migrations are in `supabase/migrations.sql` — run them in the S
 ## Design system
 
 All color tokens live in `constants/theme.ts` — a golden amber palette (warm cream background). Import named exports (`BG`, `CARD`, `ACCENT`, `TEXT`, `MUTED`, etc.) instead of hardcoding hex values. Do not add new color literals outside this file.
+
+## Data files
+
+- `data/workoutPlans.ts` — defines all built-in `WorkoutPlan` objects. Each `Exercise` uses `setBlocks: SetBlock[]` (`{ sets, reps, rpe, load }` — `null` means user-prescribed). The `metaEx()` helper builds exercises from compact `[sets, reps, rpe, load]` tuples.
+- `data/exercises.ts` — exercise library entries (name, YouTube URL, muscle groups, steps, tips) shown in the Exercises tab.
 
 ## Utility helpers
 
