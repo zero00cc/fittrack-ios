@@ -1,3 +1,4 @@
+import 'react-native-reanimated';
 import { useEffect } from 'react';
 import { useFonts } from 'expo-font';
 import { Stack, router, useSegments } from 'expo-router';
