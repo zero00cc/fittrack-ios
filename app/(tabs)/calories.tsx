@@ -62,16 +62,78 @@ const ws = StyleSheet.create({
 
 // ── Add manually modal ────────────────────────────────────────────────────────
 
+interface FoodResult {
+  name:        string;
+  kcal100g:    number;
+  protein100g: number;
+  carbs100g:   number;
+  fat100g:     number;
+}
+
 function AddManualModal({ date, onAdd, onClose }: {
   date:    string;
   onAdd:   (entry: MacroEntry) => void;
   onClose: () => void;
 }) {
-  const [name, setName] = useState('');
-  const [cal,  setCal]  = useState('');
-  const [pro,  setPro]  = useState('0');
-  const [carb, setCarb] = useState('0');
-  const [fat,  setFat]  = useState('0');
+  const [name,          setName]          = useState('');
+  const [cal,           setCal]           = useState('');
+  const [pro,           setPro]           = useState('0');
+  const [carb,          setCarb]          = useState('0');
+  const [fat,           setFat]           = useState('0');
+  const [searchResults, setSearchResults] = useState<FoodResult[]>([]);
+  const [searching,     setSearching]     = useState(false);
+  const [showDropdown,  setShowDropdown]  = useState(false);
+  const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const blurTimer   = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (searchTimer.current) clearTimeout(searchTimer.current);
+    if (name.trim().length < 2) {
+      setSearchResults([]);
+      setShowDropdown(false);
+      return;
+    }
+    searchTimer.current = setTimeout(async () => {
+      setSearching(true);
+      try {
+        const res  = await fetch(
+          `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(name.trim())}&search_simple=1&action=process&json=1&page_size=6&fields=product_name,nutriments`,
+        );
+        const data = await res.json();
+        const results: FoodResult[] = (data.products ?? [])
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          .filter((p: any) => p.product_name && p.nutriments?.['energy-kcal_100g'] != null)
+          .slice(0, 5)
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          .map((p: any) => ({
+            name:        p.product_name as string,
+            kcal100g:    Math.round(p.nutriments['energy-kcal_100g']),
+            protein100g: Math.round(p.nutriments['proteins_100g']      ?? 0),
+            carbs100g:   Math.round(p.nutriments['carbohydrates_100g'] ?? 0),
+            fat100g:     Math.round(p.nutriments['fat_100g']           ?? 0),
+          }));
+        setSearchResults(results);
+        setShowDropdown(results.length > 0);
+      } catch {
+        setSearchResults([]);
+        setShowDropdown(false);
+      } finally {
+        setSearching(false);
+      }
+    }, 400);
+    return () => { if (searchTimer.current) clearTimeout(searchTimer.current); };
+  }, [name]);
+
+  function selectFood(item: FoodResult) {
+    if (blurTimer.current) clearTimeout(blurTimer.current);
+    setName(item.name);
+    setCal(String(item.kcal100g));
+    setPro(String(item.protein100g));
+    setCarb(String(item.carbs100g));
+    setFat(String(item.fat100g));
+    setShowDropdown(false);
+    setSearchResults([]);
+  }
 
   function add() {
     const calories = parseInt(cal);
@@ -97,7 +159,47 @@ function AddManualModal({ date, onAdd, onClose }: {
             <Text style={am.title}>Add Manually</Text>
             <TouchableOpacity onPress={onClose}><Text style={am.close}>×</Text></TouchableOpacity>
           </View>
-          <TextInput style={am.nameInput} value={name} onChangeText={setName} placeholder="Food name" placeholderTextColor={DIM} autoFocus />
+
+          {/* Food name input + live search dropdown */}
+          <View style={am.searchWrap}>
+            <View style={am.nameRow}>
+              <TextInput
+                style={am.nameInput}
+                value={name}
+                onChangeText={setName}
+                placeholder="Food name"
+                placeholderTextColor={DIM}
+                autoFocus
+                onBlur={() => {
+                  blurTimer.current = setTimeout(() => setShowDropdown(false), 200);
+                }}
+                onFocus={() => {
+                  if (blurTimer.current) clearTimeout(blurTimer.current);
+                  if (searchResults.length > 0) setShowDropdown(true);
+                }}
+              />
+              {searching && (
+                <ActivityIndicator style={am.spinner} size="small" color={ACCENT} />
+              )}
+            </View>
+
+            {showDropdown && (
+              <View style={am.dropdown}>
+                {searchResults.map((item, idx) => (
+                  <TouchableOpacity
+                    key={idx}
+                    style={[am.dropItem, idx < searchResults.length - 1 && am.dropBorder]}
+                    onPress={() => selectFood(item)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={am.dropName} numberOfLines={1}>{item.name}</Text>
+                    <Text style={am.dropKcal}>{item.kcal100g} kcal / 100g</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+          </View>
+
           <View style={am.macroRow}>
             {([
               ['Calories', 'kcal', cal,  setCal,  true],
@@ -126,7 +228,17 @@ const am = StyleSheet.create({
   header:     { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   title:      { fontSize: 17, fontWeight: '700', color: TEXT, fontFamily: SERIF },
   close:      { color: MUTED, fontSize: 22, padding: 4 },
-  nameInput:  { backgroundColor: CARD, color: TEXT, fontSize: 15, fontWeight: '600', borderRadius: 9, paddingHorizontal: 14, paddingVertical: 12, borderWidth: 1, borderColor: BORDER },
+  // search
+  searchWrap: { zIndex: 20 },
+  nameRow:    { flexDirection: 'row', alignItems: 'center' },
+  nameInput:  { flex: 1, backgroundColor: CARD, color: TEXT, fontSize: 15, fontWeight: '600', borderRadius: 9, paddingHorizontal: 14, paddingVertical: 12, borderWidth: 1, borderColor: BORDER },
+  spinner:    { position: 'absolute', right: 12 },
+  dropdown:   { backgroundColor: CARD, borderRadius: 10, borderWidth: 1, borderColor: BORDER, marginTop: 4, overflow: 'hidden', elevation: 4, shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 6, shadowOffset: { width: 0, height: 2 } },
+  dropItem:   { paddingHorizontal: 14, paddingVertical: 11, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  dropBorder: { borderBottomWidth: 1, borderBottomColor: BORDER },
+  dropName:   { fontSize: 13, fontWeight: '600', color: TEXT, flex: 1, marginRight: 8 },
+  dropKcal:   { fontSize: 12, fontWeight: '700', color: ACCENT, flexShrink: 0 },
+  // macros
   macroRow:   { flexDirection: 'row', gap: 8 },
   macroField: { flex: 1, alignItems: 'center', gap: 4 },
   macroLabel: { fontSize: 9, color: MUTED, fontWeight: '700', textTransform: 'uppercase' },
