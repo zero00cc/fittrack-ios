@@ -1,5 +1,14 @@
 -- Run this in the Supabase SQL editor (Dashboard → SQL Editor → New query)
 
+-- 0. API call rate-limit log (used by Edge Functions via service role — no user RLS needed)
+create table if not exists api_call_log (
+  user_id    uuid  references auth.users(id) on delete cascade,
+  fn_name    text  not null,
+  call_date  date  not null default current_date,
+  call_count int   not null default 1,
+  primary key (user_id, fn_name, call_date)
+);
+
 -- 1. Add macro target columns to calorie_settings
 alter table calorie_settings
   add column if not exists protein_target int not null default 150,

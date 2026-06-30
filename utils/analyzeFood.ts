@@ -1,8 +1,6 @@
 import { Platform } from 'react-native';
 import * as FileSystem from 'expo-file-system/legacy';
-
-const API_KEY = process.env.EXPO_PUBLIC_ANTHROPIC_KEY ?? '';
-const MODEL   = 'claude-haiku-4-5-20251001';
+import { supabase } from '../lib/supabase';
 
 export interface AnalyzedItem {
   name:     string;
@@ -33,39 +31,18 @@ async function imageToBase64(uri: string): Promise<string> {
 }
 
 export async function analyzeFood(imageUri: string, mimeType = 'image/jpeg'): Promise<AnalysisResult> {
-  const base64 = await imageToBase64(imageUri);
+  const imageBase64 = await imageToBase64(imageUri);
 
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'Content-Type':                              'application/json',
-      'x-api-key':                                 API_KEY,
-      'anthropic-version':                         '2023-06-01',
-      'anthropic-dangerous-direct-browser-access': 'true',
-    },
-    body: JSON.stringify({
-      model:      MODEL,
-      max_tokens: 1024,
-      messages: [{
-        role:    'user',
-        content: [
-          { type: 'image', source: { type: 'base64', media_type: mimeType, data: base64 } },
-          {
-            type: 'text',
-            text: 'Analyze this food image. Return ONLY a valid JSON object — no markdown, no code fences, no extra text. Shape: {"description":"brief visual description","items":[{"name":"food name","calories":number,"protein":number,"carbs":number,"fat":number}]}. Estimate realistic portion sizes from what is visible. All macro values are in grams, calories in kcal.',
-          },
-        ],
-      }],
-    }),
+  const { data, error } = await supabase.functions.invoke('analyze-food', {
+    body: { imageBase64, mimeType },
   });
 
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: { message: `HTTP ${res.status}` } }));
-    throw new Error(err.error?.message ?? `Server error ${res.status}`);
+  if (error) {
+    // Try to surface the specific error message from the response body (e.g. rate limit)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const body = await (error as any).context?.json?.().catch(() => null);
+    throw new Error(body?.error ?? error.message);
   }
 
-  const data  = await res.json();
-  const text: string = data.content?.[0]?.text ?? '';
-  const clean = text.replace(/^```(?:json)?\n?|\n?```$/g, '').trim();
-  return JSON.parse(clean) as AnalysisResult;
+  return data as AnalysisResult;
 }

@@ -31,11 +31,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Restore existing session on mount
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session);
-      setLoading(false);
-    });
+    // getUser() validates the JWT against Supabase servers (unlike getSession() which only
+    // reads the local token without server verification — a forged/expired JWT would pass).
+    // Falls back to local session on network error to avoid logging users out when offline.
+    supabase.auth.getUser()
+      .then(async ({ data: { user } }) => {
+        const session = user ? (await supabase.auth.getSession()).data.session : null;
+        setSession(session);
+        setLoading(false);
+      })
+      .catch(async () => {
+        const { data } = await supabase.auth.getSession();
+        setSession(data.session);
+        setLoading(false);
+      });
 
     // Listen for auth state changes (login, logout, token refresh)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {

@@ -2,9 +2,7 @@ import { CalorieGoals, CalorieHistory } from '../types/calorie.types';
 import { UserProfile, ACTIVITY_OPTIONS, GOAL_OPTIONS } from './nutritionCalc';
 import { dayTotals } from './calorieUtils';
 import { getLast30Days } from './dateUtils';
-
-const API_KEY = process.env.EXPO_PUBLIC_ANTHROPIC_KEY ?? '';
-const MODEL   = 'claude-haiku-4-5-20251001';
+import { supabase } from '../lib/supabase';
 
 export type ReportType = 'week' | 'month';
 
@@ -97,26 +95,15 @@ Under RECOMMENDATIONS, give 3-5 specific, actionable tips directly related to th
 
 Keep it concise, encouraging, and data-driven.`;
 
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'Content-Type':                              'application/json',
-      'x-api-key':                                 API_KEY,
-      'anthropic-version':                         '2023-06-01',
-      'anthropic-dangerous-direct-browser-access': 'true',
-    },
-    body: JSON.stringify({
-      model:      MODEL,
-      max_tokens: 1200,
-      messages:   [{ role: 'user', content: prompt }],
-    }),
+  const { data, error } = await supabase.functions.invoke('generate-report', {
+    body: { prompt },
   });
 
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: { message: `HTTP ${res.status}` } }));
-    throw new Error(err.error?.message ?? `Server error ${res.status}`);
+  if (error) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const body = await (error as any).context?.json?.().catch(() => null);
+    throw new Error(body?.error ?? error.message);
   }
 
-  const data = await res.json();
-  return (data.content?.[0]?.text ?? '').trim();
+  return (data as { text: string }).text;
 }
