@@ -2,8 +2,6 @@ import { useEffect } from 'react';
 import { useFonts } from 'expo-font';
 import { Stack, router, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
-import 'react-native-reanimated';
-
 import { AuthProvider, useAuth } from '../context/AuthContext';
 
 export { ErrorBoundary } from 'expo-router';
