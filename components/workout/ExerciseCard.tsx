@@ -1,6 +1,12 @@
 import { useState } from 'react';
-import { View, Text, TouchableOpacity, Linking, StyleSheet } from 'react-native';
+import { Alert, View, Text, TouchableOpacity, Linking, StyleSheet } from 'react-native';
 import { Exercise, SetBlock } from '../../types/workout.types';
+
+interface LatestPR {
+  squat: number | null;
+  bench: number | null;
+  deadlift: number | null;
+}
 
 interface Props {
   exercise: Exercise;
@@ -8,6 +14,7 @@ interface Props {
   onUpdateBlock: (blockIndex: number, newCount: number) => void;
   onEditSetBlocks?: (newBlocks: SetBlock[]) => void;
   onRemove?: () => void;
+  latestPR?: LatestPR | null;
 }
 
 // ── Number stepper ────────────────────────────────────────────────
@@ -68,8 +75,20 @@ function fmt(val: number | null): string {
   return val === null ? '—' : String(val);
 }
 
+function resolveLoad(
+  block: SetBlock,
+  liftType: Exercise['liftType'],
+  pr: LatestPR | null | undefined,
+): number | null {
+  if (block.load !== null && block.load !== undefined) return block.load;
+  if (!block.intensity || !liftType || !pr) return null;
+  const prVal = pr[liftType];
+  if (!prVal) return null;
+  return Math.round(prVal * block.intensity / 100);
+}
+
 // ── ExerciseCard ──────────────────────────────────────────────────
-export function ExerciseCard({ exercise, blockProgress, onUpdateBlock, onEditSetBlocks, onRemove }: Props) {
+export function ExerciseCard({ exercise, blockProgress, onUpdateBlock, onEditSetBlocks, onRemove, latestPR }: Props) {
   const [editing, setEditing] = useState(false);
   const [draftBlocks, setDraftBlocks] = useState<SetBlock[]>([]);
 
@@ -142,13 +161,16 @@ export function ExerciseCard({ exercise, blockProgress, onUpdateBlock, onEditSet
       {exercise.notes ? <Text style={styles.notes}>{exercise.notes}</Text> : null}
 
       {/* ── Edit mode ── */}
-      {editing && (
+      {editing && (() => {
+        const hasIntensity = draftBlocks.some(b => b.intensity);
+        return (
         <View style={styles.table}>
           <View style={styles.tableHeader}>
             <Text style={styles.tableHeadCell}>Sets</Text>
             <Text style={styles.tableHeadCell}>Reps</Text>
             <Text style={styles.tableHeadCell}>RPE</Text>
             <Text style={styles.tableHeadCell}>Load</Text>
+            {hasIntensity && <Text style={styles.tableHeadCellSm}>Int%</Text>}
             <View style={styles.deleteCol} />
           </View>
 
@@ -174,6 +196,13 @@ export function ExerciseCard({ exercise, blockProgress, onUpdateBlock, onEditSet
                 onChange={(v) => updateDraft(i, 'load', v)}
                 step={2.5} min={0} max={500} nullable decimals={1}
               />
+              {hasIntensity && (
+                <Stepper
+                  value={block.intensity ?? null}
+                  onChange={(v) => updateDraft(i, 'intensity', v)}
+                  step={1} min={1} max={200} nullable
+                />
+              )}
               <TouchableOpacity
                 onPress={() => removeRow(i)}
                 disabled={draftBlocks.length <= 1}
@@ -197,58 +226,76 @@ export function ExerciseCard({ exercise, blockProgress, onUpdateBlock, onEditSet
             </TouchableOpacity>
           </View>
         </View>
-      )}
+        );
+      })()}
 
       {/* ── Read-only table ── */}
       {!editing && (
         <View style={styles.table}>
-          <View style={styles.tableHeader}>
-            {['Sets', 'Reps', 'RPE', 'Load', ''].map((h, i) => (
-              <Text key={i} style={[styles.tableHeadCell, i === 4 && styles.actionCell]}>{h}</Text>
-            ))}
-          </View>
-          {currentBlocks.map((block, i) => {
-            const completed = blockProgress[i] ?? 0;
-            const done = completed >= block.sets;
+          {(() => {
+            const hasIntensity = currentBlocks.some(b => b.intensity);
             return (
-              <View key={i} style={[styles.tableRow, done && styles.tableRowDone]}>
-                <Text style={styles.tableCell}>{block.sets}</Text>
-                <Text style={styles.tableCell}>{fmt(block.reps)}</Text>
-                <Text style={[styles.tableCell, styles.muted]}>{fmt(block.rpe)}</Text>
-                <Text style={[styles.tableCell, styles.muted]}>{fmt(block.load)}</Text>
-                <View style={styles.actionCell}>
-                  {block.sets === 1 ? (
-                    <TouchableOpacity
-                      onPress={() => onUpdateBlock(i, done ? 0 : 1)}
-                      style={[styles.toggleBtn, done && styles.toggleBtnDone]}
-                    >
-                      <Text style={[styles.toggleBtnText, done && styles.toggleBtnTextDone]}>✓</Text>
-                    </TouchableOpacity>
-                  ) : (
-                    <View style={styles.counter}>
-                      <TouchableOpacity
-                        onPress={() => onUpdateBlock(i, Math.max(0, completed - 1))}
-                        disabled={completed === 0}
-                        style={[styles.counterBtn, completed === 0 && styles.counterBtnDisabled]}
-                      >
-                        <Text style={styles.counterBtnText}>−</Text>
-                      </TouchableOpacity>
-                      <Text style={[styles.counterLabel, done && styles.counterLabelDone]}>
-                        {completed}/{block.sets}
-                      </Text>
-                      <TouchableOpacity
-                        onPress={() => onUpdateBlock(i, Math.min(block.sets, completed + 1))}
-                        disabled={done}
-                        style={[styles.counterBtn, done && styles.counterBtnDisabled]}
-                      >
-                        <Text style={styles.counterBtnText}>+</Text>
-                      </TouchableOpacity>
-                    </View>
-                  )}
+              <>
+                <View style={styles.tableHeader}>
+                  <Text style={styles.tableHeadCell}>Sets</Text>
+                  <Text style={styles.tableHeadCell}>Reps</Text>
+                  <Text style={styles.tableHeadCell}>RPE</Text>
+                  <Text style={styles.tableHeadCell}>Load</Text>
+                  {hasIntensity && <Text style={styles.tableHeadCellSm}>%1RM</Text>}
+                  <View style={styles.actionCell} />
                 </View>
-              </View>
+                {currentBlocks.map((block, i) => {
+                  const completed = blockProgress[i] ?? 0;
+                  const done = completed >= block.sets;
+                  return (
+                    <View key={i} style={[styles.tableRow, done && styles.tableRowDone]}>
+                      <Text style={styles.tableCell}>{block.sets}</Text>
+                      <Text style={styles.tableCell}>{fmt(block.reps)}</Text>
+                      <Text style={[styles.tableCell, styles.muted]}>{fmt(block.rpe)}</Text>
+                      <Text style={[styles.tableCell, styles.muted]}>
+                        {fmt(resolveLoad(block, exercise.liftType, latestPR))}
+                      </Text>
+                      {hasIntensity && (
+                        <Text style={[styles.tableCellSm, styles.intensityCell]}>
+                          {block.intensity ? `${block.intensity}%` : '—'}
+                        </Text>
+                      )}
+                      <View style={styles.actionCell}>
+                        {block.sets === 1 ? (
+                          <TouchableOpacity
+                            onPress={() => onUpdateBlock(i, done ? 0 : 1)}
+                            style={[styles.toggleBtn, done && styles.toggleBtnDone]}
+                          >
+                            <Text style={[styles.toggleBtnText, done && styles.toggleBtnTextDone]}>✓</Text>
+                          </TouchableOpacity>
+                        ) : (
+                          <View style={styles.counter}>
+                            <TouchableOpacity
+                              onPress={() => onUpdateBlock(i, Math.max(0, completed - 1))}
+                              disabled={completed === 0}
+                              style={[styles.counterBtn, completed === 0 && styles.counterBtnDisabled]}
+                            >
+                              <Text style={styles.counterBtnText}>−</Text>
+                            </TouchableOpacity>
+                            <Text style={[styles.counterLabel, done && styles.counterLabelDone]}>
+                              {completed}/{block.sets}
+                            </Text>
+                            <TouchableOpacity
+                              onPress={() => onUpdateBlock(i, Math.min(block.sets, completed + 1))}
+                              disabled={done}
+                              style={[styles.counterBtn, done && styles.counterBtnDisabled]}
+                            >
+                              <Text style={styles.counterBtnText}>+</Text>
+                            </TouchableOpacity>
+                          </View>
+                        )}
+                      </View>
+                    </View>
+                  );
+                })}
+              </>
             );
-          })}
+          })()}
         </View>
       )}
     </View>
@@ -273,6 +320,7 @@ const styles = StyleSheet.create({
   table: { marginTop: 8 },
   tableHeader: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: '#f3f4f6', paddingBottom: 4, marginBottom: 2 },
   tableHeadCell: { flex: 1, fontSize: 10, color: '#9ca3af', fontWeight: '600' },
+  tableHeadCellSm: { flex: 0.85, fontSize: 10, color: '#9ca3af', fontWeight: '600' },
   // Edit mode
   editRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: '#f9fafb' },
   deleteCol: { width: 28, alignItems: 'center', justifyContent: 'center' },
@@ -289,6 +337,8 @@ const styles = StyleSheet.create({
   tableRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 5 },
   tableRowDone: { opacity: 0.4 },
   tableCell: { flex: 1, fontSize: 11, color: '#374151' },
+  tableCellSm: { flex: 0.85, fontSize: 11, color: '#374151' },
+  intensityCell: { color: '#f59e0b', fontWeight: '600' },
   muted: { color: '#9ca3af' },
   actionCell: { flex: 1.8, alignItems: 'flex-start' },
   toggleBtn: { width: 24, height: 24, borderRadius: 12, borderWidth: 2, borderColor: '#d1d5db', alignItems: 'center', justifyContent: 'center' },
