@@ -122,25 +122,61 @@ export default function CalorieOnboardingScreen() {
           <View style={s.stepWrap}>
             <Text style={s.stepTitle}>Your Measurements</Text>
             <Text style={s.stepSub}>Used to calculate BMR and TDEE. Updatable any time in settings.</Text>
-            <NumField label="Age" value={age} unit="yrs" onChange={setAge} />
-            <View style={s.unitRow}>
-              <NumField label="Weight" value={weight} unit="" onChange={setWeight} />
-              <View style={s.unitToggle}>
-                {(['kg', 'lbs'] as const).map((u) => (
-                  <TouchableOpacity key={u} style={[s.unitBtn, weightUnit === u && s.unitBtnActive]} onPress={() => setWU(u)}>
-                    <Text style={[s.unitBtnTxt, weightUnit === u && s.unitBtnTxtActive]}>{u}</Text>
-                  </TouchableOpacity>
-                ))}
+
+            {/* Age */}
+            <View style={s.measRow}>
+              <Text style={s.measLabel}>Age</Text>
+              <View style={s.measRight}>
+                <TextInput
+                  style={s.measInput}
+                  value={age}
+                  onChangeText={setAge}
+                  keyboardType="decimal-pad"
+                  selectTextOnFocus
+                />
+                <Text style={s.measUnit}>yrs</Text>
               </View>
             </View>
-            <View style={s.unitRow}>
-              <NumField label="Height" value={height} unit="" onChange={setHeight} />
-              <View style={s.unitToggle}>
-                {(['cm', 'in'] as const).map((u) => (
-                  <TouchableOpacity key={u} style={[s.unitBtn, heightUnit === u && s.unitBtnActive]} onPress={() => setHU(u)}>
-                    <Text style={[s.unitBtnTxt, heightUnit === u && s.unitBtnTxtActive]}>{u}</Text>
-                  </TouchableOpacity>
-                ))}
+
+            {/* Weight */}
+            <View style={s.measRow}>
+              <Text style={s.measLabel}>Weight</Text>
+              <View style={s.measRight}>
+                <TextInput
+                  style={s.measInput}
+                  value={weight}
+                  onChangeText={setWeight}
+                  keyboardType="decimal-pad"
+                  selectTextOnFocus
+                />
+                <View style={s.unitToggle}>
+                  {(['kg', 'lbs'] as const).map((u) => (
+                    <TouchableOpacity key={u} style={[s.unitBtn, weightUnit === u && s.unitBtnActive]} onPress={() => setWU(u)}>
+                      <Text style={[s.unitBtnTxt, weightUnit === u && s.unitBtnTxtActive]}>{u}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+            </View>
+
+            {/* Height */}
+            <View style={s.measRow}>
+              <Text style={s.measLabel}>Height</Text>
+              <View style={s.measRight}>
+                <TextInput
+                  style={s.measInput}
+                  value={height}
+                  onChangeText={setHeight}
+                  keyboardType="decimal-pad"
+                  selectTextOnFocus
+                />
+                <View style={s.unitToggle}>
+                  {(['cm', 'in'] as const).map((u) => (
+                    <TouchableOpacity key={u} style={[s.unitBtn, heightUnit === u && s.unitBtnActive]} onPress={() => setHU(u)}>
+                      <Text style={[s.unitBtnTxt, heightUnit === u && s.unitBtnTxtActive]}>{u}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
               </View>
             </View>
           </View>
@@ -275,9 +311,14 @@ const s = StyleSheet.create({
   pillTxt:       { fontSize: 16, fontWeight: '700', color: MUTED },
   pillTxtActive: { color: BG },
 
-  unitRow:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  measRow:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: CARD, borderRadius: 12, paddingHorizontal: 16, paddingVertical: 14, borderWidth: 1, borderColor: BORDER },
+  measLabel: { fontSize: 15, fontWeight: '700', color: TEXT },
+  measRight: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  measInput: { backgroundColor: BG, color: TEXT, fontSize: 20, fontWeight: '800', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 7, width: 82, textAlign: 'center', borderWidth: 1, borderColor: BORDER, fontFamily: SERIF },
+  measUnit:  { fontSize: 13, color: MUTED, fontWeight: '600', minWidth: 28 },
+
   unitToggle:    { flexDirection: 'row', gap: 4 },
-  unitBtn:       { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 7, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER },
+  unitBtn:       { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 7, backgroundColor: BG, borderWidth: 1, borderColor: BORDER },
   unitBtnActive: { backgroundColor: TEXT, borderColor: TEXT },
   unitBtnTxt:    { fontSize: 12, color: MUTED, fontWeight: '600' },
   unitBtnTxtActive: { color: BG },
