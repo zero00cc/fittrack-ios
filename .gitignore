@@ -40,3 +40,7 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# generated logs and caches
+expo-server.log
+node-compile-cache/
