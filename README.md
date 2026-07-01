@@ -8,6 +8,41 @@ A React Native + Expo fitness tracking app for logging calories, following power
 
 [▶ Watch full demo (5 min)](assets/demo.mp4)
 
+## Screenshots
+
+<table>
+  <tr>
+    <td align="center"><b>Home</b></td>
+    <td align="center"><b>Calorie Tracker</b></td>
+    <td align="center"><b>AI Food Analysis</b></td>
+  </tr>
+  <tr>
+    <td><img src="assets/screenshots/home.png" width="220"/></td>
+    <td><img src="assets/screenshots/calories.png" width="220"/></td>
+    <td><img src="assets/screenshots/ai-food.png" width="220"/></td>
+  </tr>
+  <tr>
+    <td align="center"><b>Workout Plan</b></td>
+    <td align="center"><b>Workout Session</b></td>
+    <td align="center"><b>Strength Progress</b></td>
+  </tr>
+  <tr>
+    <td><img src="assets/screenshots/workout-plan.png" width="220"/></td>
+    <td><img src="assets/screenshots/workout-session.png" width="220"/></td>
+    <td><img src="assets/screenshots/pr-history.png" width="220"/></td>
+  </tr>
+  <tr>
+    <td align="center"><b>Exercise Library</b></td>
+    <td align="center"><b>Global Ranking</b></td>
+    <td></td>
+  </tr>
+  <tr>
+    <td><img src="assets/screenshots/exercises.png" width="220"/></td>
+    <td><img src="assets/screenshots/ranking.png" width="220"/></td>
+    <td></td>
+  </tr>
+</table>
+
 ## Features
 
 - **Calorie Tracker** — Log daily meals, set macro targets (calories/protein/carbs/fat), view a 30-day history chart, and analyze food photos with AI (via Supabase Edge Functions + Claude)
