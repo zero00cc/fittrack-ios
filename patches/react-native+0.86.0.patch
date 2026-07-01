@@ -1,0 +1,53 @@
+diff --git a/node_modules/react-native/ReactCommon/react/nativemodule/core/platform/ios/ReactCommon/RCTTurboModule.mm b/node_modules/react-native/ReactCommon/react/nativemodule/core/platform/ios/ReactCommon/RCTTurboModule.mm
+index a1111f9..b32acbe 100644
+--- a/node_modules/react-native/ReactCommon/react/nativemodule/core/platform/ios/ReactCommon/RCTTurboModule.mm
++++ b/node_modules/react-native/ReactCommon/react/nativemodule/core/platform/ios/ReactCommon/RCTTurboModule.mm
+@@ -392,6 +392,9 @@ id ObjCTurboModule::performMethodInvocation(
+       TurboModulePerfLogger::asyncMethodCallExecutionStart(moduleName, methodName, asyncCallCounter);
+     }
+ 
++    // iOS 26 changed objc_exception_rethrow to call __cxa_rethrow, which terminates
++    // when called at the end of a @finally block. Move ObjC rethrow outside @finally.
++    NSException *asyncCaughtException = nil;
+     @try {
+       [inv invokeWithTarget:strongModule];
+     } @catch (NSException *exception) {
+@@ -400,11 +403,14 @@ id ObjCTurboModule::performMethodInvocation(
+         // See https://github.com/reactwg/react-native-new-architecture/discussions/276#discussioncomment-12567155
+         throw convertNSExceptionToJSError(runtime, exception, std::string{moduleName}, methodNameStr);
+       } else {
+-        @throw exception;
++        asyncCaughtException = exception;
+       }
+     } @finally {
+       [retainedObjectsForInvocation removeAllObjects];
+     }
++    if (asyncCaughtException) {
++      @throw asyncCaughtException;
++    }
+ 
+     if (!isSync) {
+       TurboModulePerfLogger::asyncMethodCallExecutionEnd(moduleName, methodName, asyncCallCounter);
+@@ -457,15 +463,21 @@ void ObjCTurboModule::performVoidMethodInvocation(
+ 
+     TurboModulePerfLogger::asyncMethodCallExecutionStart(moduleName, methodName, asyncCallCounter);
+ 
++    // iOS 26 changed objc_exception_rethrow to call __cxa_rethrow, which terminates
++    // when called at the end of a @finally block. Move ObjC rethrow outside @finally.
++    NSException *voidCaughtException = nil;
+     @try {
+       [inv invokeWithTarget:strongModule];
+     } @catch (NSException *exception) {
+       // Void methods are always async, re-throw instead of converting to
+       // JSError, same as the async branch in performMethodInvocation.
+-      @throw exception;
++      voidCaughtException = exception;
+     } @finally {
+       [retainedObjectsForInvocation removeAllObjects];
+     }
++    if (voidCaughtException) {
++      @throw voidCaughtException;
++    }
+ 
+     TurboModulePerfLogger::asyncMethodCallExecutionEnd(moduleName, methodName, asyncCallCounter);
+ 
