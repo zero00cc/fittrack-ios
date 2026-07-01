@@ -40,10 +40,18 @@ export default function RootLayout() {
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
   });
 
-  useEffect(() => { if (error) throw error; }, [error]);
-  useEffect(() => { if (loaded) SplashScreen.hideAsync(); }, [loaded]);
+  // Safety net: force-hide splash after 5s so the app never stays stuck
+  useEffect(() => {
+    const t = setTimeout(() => SplashScreen.hideAsync().catch(() => {}), 5000);
+    return () => clearTimeout(t);
+  }, []);
 
-  if (!loaded) return null;
+  useEffect(() => { if (error) console.error('Font load error:', error); }, [error]);
+  useEffect(() => {
+    if (loaded || error) SplashScreen.hideAsync().catch(() => {});
+  }, [loaded, error]);
+
+  if (!loaded && !error) return null;
 
   return (
     <AuthProvider>

@@ -1,26 +1,23 @@
-import { ErrorUtils } from 'react-native';
+import { ErrorUtils, Alert } from 'react-native';
 
 // iOS 26 crash workaround:
 // When a fatal JS error occurs, RN calls RCTExceptionsManager.reportFatalException
-// (native), which calls RCTFatal, which throws an NSException. That exception
-// propagates through ObjCTurboModule::performVoidMethodInvocation's @catch/@finally,
-// and iOS 26 changed objc_exception_rethrow to call __cxa_rethrow, which calls
-// std::terminate() instead of propagating the exception — crashing the app.
-//
-// By intercepting the fatal error here on the JS side, we prevent the native
-// reportFatalException call entirely, so the NSException is never thrown and
-// the crash chain never starts.
+// (native) → RCTFatal → NSException → ObjCTurboModule @catch/@finally →
+// objc_exception_rethrow → __cxa_rethrow → std::terminate() on iOS 26.
+// We intercept here so the native throw never happens.
 const _prevHandler = ErrorUtils.getGlobalHandler();
 ErrorUtils.setGlobalHandler((error, isFatal) => {
+  console.error('[FitTrack] JS error (isFatal=' + isFatal + '):', error?.message, error?.stack);
   if (isFatal) {
-    // Log so Xcode / device console shows the real underlying error
-    console.error(
-      '[FitTrack] Fatal JS error intercepted (iOS 26 crash prevention):',
-      error?.message,
-      error?.stack,
-    );
-    // Do NOT call _prevHandler — that invokes RCTExceptionsManager.reportFatalException
-    // which leads to the ObjCTurboModule rethrow crash on iOS 26.
+    // Show the real error so we can diagnose what's failing at startup
+    setTimeout(() => {
+      Alert.alert(
+        'Startup Error (debug)',
+        error?.message + '\n\n' + (error?.stack || '').split('\n').slice(0, 6).join('\n'),
+        [{ text: 'OK' }],
+      );
+    }, 500);
+    // Do NOT call _prevHandler — leads to ObjCTurboModule rethrow crash on iOS 26
     return;
   }
   _prevHandler(error, isFatal);
