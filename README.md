@@ -1,50 +1,27 @@
 # FitTrack iOS
 
-A React Native + Expo fitness app for tracking calories, following workout plans, browsing exercise guidance, and logging photos.
+A React Native + Expo fitness tracking app for logging calories, following powerlifting programs, browsing exercise guidance, and competing on a global leaderboard.
+
+## Demo
+
+<video src="assets/demo.mp4" width="390" controls autoplay loop muted></video>
 
 ## Features
 
-- **Calorie Tracker** — Log daily meals from a 30-item food library, set a daily calorie target, view a 30-day color-coded history chart, and analyze food photos with AI
-- **Workout Plans** — Level selector (Beginner / Intermediate / Professional), Meta 5/3/1 powerlifting plan with per-set tracking and auto-finish
-- **Exercise Library** — Step-by-step instructions, coaching tips, and YouTube links for Bench Press, Deadlift, and Squat
-- **Gallery** — Upload and browse photos of meals and workouts in two separate tabs
+- **Calorie Tracker** — Log daily meals, set macro targets (calories/protein/carbs/fat), view a 30-day history chart, and analyze food photos with AI (via Supabase Edge Functions + Claude)
+- **Workout Plans** — Beginner / Intermediate / Professional powerlifting programs (Meta 5/3/1, GZCLP, and more), with per-set tracking, RPE guidance, and intensity-based load calculation from your personal records
+- **Exercise Library** — Step-by-step instructions, coaching tips, and YouTube demos for every exercise
+- **Global Ranking** — Submit your Squat / Bench / Deadlift totals and rank against other users by IPF weight class
+- **Workout History** — Completed plan log, activity calendar, and personal record (PR) tracker for the Big 3
+- **AI Reports** — Weekly and monthly fitness summaries generated from your calorie and weight history
 
 ## Tech Stack
 
-- React Native + Expo (expo-router, file-based tabs navigation)
+- React Native 0.86 + Expo SDK 57 (expo-router, file-based navigation)
 - TypeScript
-- AsyncStorage — persists all app state locally on device
-- expo-file-system — stores gallery images in the app document directory
-- expo-image-picker — camera and photo library access
-- Anthropic API (claude-haiku) — food photo analysis
-
-## Project Structure
-
-```
-fittrack-ios/
-├── app/
-│   └── (tabs)/
-│       ├── _layout.tsx       # Tab bar (5 tabs)
-│       ├── index.tsx         # Home screen
-│       ├── calories.tsx      # Calorie Tracker
-│       ├── workouts.tsx      # Workout Plans
-│       ├── exercises.tsx     # Exercise Library
-│       └── gallery.tsx       # Gallery
-├── components/
-│   ├── calorie/
-│   │   ├── CalorieHistoryChart.tsx   # 30-day bar chart
-│   │   └── SnapTrack.tsx             # Photo analysis
-│   └── workout/
-│       └── ExerciseCard.tsx          # Set tracking UI
-├── hooks/
-│   ├── useAsyncStorage.ts    # Generic async storage hook
-│   ├── useCalorieStore.ts    # Calorie state + persistence
-│   ├── useWorkoutStore.ts    # Workout state + persistence
-│   └── useGalleryStore.ts    # Gallery metadata + file management
-├── types/                    # TypeScript interfaces
-├── data/                     # Foods, exercises, workout plans
-└── utils/                    # Date and calorie utilities
-```
+- Supabase — auth, cloud sync (calorie history, workout state, weight log), Storage (gallery images), and Edge Functions (Anthropic API proxy)
+- AsyncStorage — local-first persistence; Supabase is synced in the background
+- Hermes JavaScript engine
 
 ## Setup
 
@@ -54,73 +31,60 @@ fittrack-ios/
 npm install
 ```
 
-### 2. Add your Anthropic API key
+### 2. Environment variables
 
-Create or edit `.env` in the project root:
+Create `.env` in the project root:
 
 ```
-EXPO_PUBLIC_ANTHROPIC_KEY=sk-ant-...
+EXPO_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+EXPO_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 ```
 
-This key is used for food photo analysis. The `.env` file is gitignored.
+The Anthropic API key lives as a Supabase Edge Function secret (`ANTHROPIC_KEY`) — it never reaches the client.
 
-### 3. Run the app
+### 3. Deploy Edge Functions
 
 ```bash
-npm start
+supabase functions deploy analyze-food --no-verify-jwt
+supabase functions deploy generate-report --no-verify-jwt
+supabase secrets set ANTHROPIC_KEY=sk-ant-...
 ```
 
-Install **Expo Go** on your iPhone, then scan the QR code or enter the URL manually:
+### 4. Run the app
+
+```bash
+npx expo start --ios     # iOS simulator
+npx expo start           # Expo Go on device (scan QR)
+```
+
+## Project Structure
 
 ```
-exp://YOUR_MAC_IP:8081
-```
-
-Your iPhone and Mac must be on the same Wi-Fi network.
-
-## Calorie Chart Colors
-
-| Color | Meaning | Threshold (default 2000 kcal target) |
-|---|---|---|
-| 🔵 Blue | Low intake | Below 1800 kcal (< 90% of target) |
-| 🟢 Green | Normal intake | 1800 – 2200 kcal (90–110% of target) |
-| 🔴 Red | High intake | Above 2200 kcal (> 110% of target) |
-
-Thresholds scale automatically when the daily target is changed.
-
-## Workout Plans
-
-Currently only **Meta 5/3/1** (Professional level) is active. Future plans can be added to `data/workoutPlans.ts` using the `setBlocks` format.
-
-Set tracking per row:
-- `sets = 1` → toggle button (tap to mark done / undo)
-- `sets > 1` → counter stepper (−  N/total  +)
-
-When all sets across all exercises in a day are completed, the day is automatically marked finished in the calendar.
-
-## AsyncStorage Keys
-
-| Key | Contents |
-|---|---|
-| `fittrack_calorie_history` | All daily meal logs keyed by `YYYY-MM-DD` |
-| `fittrack_calorie_settings` | `{ dailyTarget: 2000 }` |
-| `fittrack_workout_state` | Selected level, active plan, day status, set progress |
-| `fittrack_gallery_meta` | Gallery item metadata (URIs, dates, categories) |
-
-Gallery images are saved to the app's document directory under `fittrack_gallery/`.
-
-## Adding More Exercises
-
-Edit `data/exercises.ts` — each entry takes a name, YouTube video ID, muscle groups, steps, and tips:
-
-```ts
-{
-  id: 'overhead-press',
-  name: 'Overhead Press',
-  youtubeId: 'YOUR_VIDEO_ID',
-  description: '...',
-  muscleGroups: ['Shoulders', 'Triceps'],
-  steps: ['Step 1...', 'Step 2...'],
-  tips: ['Tip 1...'],
-}
+fittrack-ios/
+├── app/
+│   ├── (tabs)/           # Main tab screens (home, calories, workouts, exercises, ranking)
+│   ├── (auth)/           # Login / sign-up
+│   ├── calorie-*.tsx     # Calorie onboarding, settings, progress, result screens
+│   ├── workout-history.tsx
+│   └── resources.tsx
+├── context/
+│   └── AuthContext.tsx   # Supabase auth wrapper
+├── hooks/
+│   ├── useAsyncStorage.ts
+│   ├── useCalorieStore.ts
+│   ├── useWorkoutStore.ts
+│   ├── useGalleryStore.ts
+│   └── useLeaderboard.ts
+├── data/
+│   ├── workoutPlans.ts   # All built-in workout programs
+│   └── exercises.ts      # Exercise library
+├── supabase/
+│   ├── functions/        # Edge Functions (analyze-food, generate-report)
+│   └── migrations.sql
+├── utils/
+│   ├── nutritionCalc.ts  # BMR/TDEE (Mifflin-St Jeor)
+│   ├── analyzeFood.ts    # Food photo → AI analysis
+│   └── generateReport.ts # AI fitness report
+└── constants/
+    └── theme.ts          # Design tokens (amber palette)
 ```
