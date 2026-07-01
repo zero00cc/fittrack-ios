@@ -4,7 +4,9 @@ A React Native + Expo fitness tracking app for logging calories, following power
 
 ## Demo
 
-<video src="assets/demo.mp4" width="390" controls autoplay loop muted></video>
+<img src="assets/demo-preview.gif" width="280" alt="FitTrack demo" />
+
+[▶ Watch full demo (5 min)](assets/demo.mp4)
 
 ## Features
 
