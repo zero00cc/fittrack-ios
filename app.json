@@ -3,6 +3,7 @@
     "name": "fittrack-ios",
     "slug": "fittrack-ios",
     "version": "1.0.0",
+    "newArchEnabled": false,
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "fittrackios",
@@ -10,7 +11,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.chaohaogu.fittrack",
-      "buildNumber": "8",
+      "buildNumber": "9",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
