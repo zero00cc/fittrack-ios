@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, Animated,
   StyleSheet, Alert, Modal, TextInput, Image, ActivityIndicator,
+  KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
@@ -153,6 +154,7 @@ function AddManualModal({ date, onAdd, onClose }: {
 
   return (
     <Modal visible animationType="slide" transparent>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <View style={am.overlay}>
         <View style={am.sheet}>
           <View style={am.header}>
@@ -219,6 +221,7 @@ function AddManualModal({ date, onAdd, onClose }: {
           </TouchableOpacity>
         </View>
       </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
@@ -278,6 +281,7 @@ function LogWeightModal({ date, weightLog, unit, onSave, onClose }: {
 
   return (
     <Modal visible animationType="slide" transparent>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <View style={lw.overlay}>
         <View style={lw.sheet}>
           <View style={lw.header}>
@@ -307,6 +311,7 @@ function LogWeightModal({ date, weightLog, unit, onSave, onClose }: {
           </TouchableOpacity>
         </View>
       </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
@@ -342,6 +347,7 @@ function EditEntryModal({ entry, onSave, onDelete, onClose }: {
 
   return (
     <Modal visible animationType="slide" transparent>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <View style={em.overlay}>
         <View style={em.sheet}>
           <View style={em.header}>
@@ -382,6 +388,7 @@ function EditEntryModal({ entry, onSave, onDelete, onClose }: {
           </View>
         </View>
       </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
