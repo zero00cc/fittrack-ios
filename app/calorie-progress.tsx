@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, Modal,
-  StyleSheet, TextInput, ActivityIndicator,
+  StyleSheet, TextInput, ActivityIndicator, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useCalorieStore } from '../hooks/useCalorieStore';
@@ -295,6 +295,7 @@ function WeightModal({ initialDate, weightLog, unit, onSave, onClose }: {
 
   return (
     <Modal visible animationType="slide" transparent>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <View style={wm.overlay}>
         <View style={wm.sheet}>
           <View style={wm.header}>
@@ -348,6 +349,7 @@ function WeightModal({ initialDate, weightLog, unit, onSave, onClose }: {
           </TouchableOpacity>
         </View>
       </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
@@ -744,6 +746,7 @@ function DayModal({ date, history, goals, addEntry, updateEntry, removeHistoryEn
 
   return (
     <Modal visible animationType="fade" transparent>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <TouchableOpacity style={dm.backdrop} activeOpacity={1} onPress={onClose}>
         <TouchableOpacity activeOpacity={1} style={dm.card} onPress={() => {}}>
           <View style={dm.header}>
@@ -791,6 +794,7 @@ function DayModal({ date, history, goals, addEntry, updateEntry, removeHistoryEn
           </ScrollView>
         </TouchableOpacity>
       </TouchableOpacity>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }

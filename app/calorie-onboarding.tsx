@@ -6,7 +6,7 @@
 import { useState } from 'react';
 import {
   View, Text, TouchableOpacity, TextInput,
-  ScrollView, StyleSheet,
+  ScrollView, StyleSheet, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -267,6 +267,7 @@ export default function CalorieOnboardingScreen() {
 
   return (
     <SafeAreaView style={s.safe} edges={['top', 'bottom']}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <View style={s.progressTrack}>
         <View style={[s.progressFill, { width: `${progressPct}%` as any }]} />
       </View>
@@ -289,6 +290,7 @@ export default function CalorieOnboardingScreen() {
           </TouchableOpacity>
         )}
       </View>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }

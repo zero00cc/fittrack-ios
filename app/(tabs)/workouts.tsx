@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Modal, StyleSheet, TextInput, Animated } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Modal, StyleSheet, TextInput, Animated, KeyboardAvoidingView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -1106,6 +1106,7 @@ export default function WorkoutsScreen() {
       {/* ── PR input modal (shown before activating a plan) ─────── */}
       {showPRInput && (
         <Modal visible transparent animationType="slide">
+          <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
           <View style={styles.prOverlay}>
             <View style={styles.prCard}>
               <Text style={styles.prTitle}>Log Your Current PRs</Text>
@@ -1149,6 +1150,7 @@ export default function WorkoutsScreen() {
               </TouchableOpacity>
             </View>
           </View>
+          </KeyboardAvoidingView>
         </Modal>
       )}
 

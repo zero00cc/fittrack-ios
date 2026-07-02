@@ -1,5 +1,5 @@
 import { useMemo, useRef, useEffect, useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Modal, TextInput, StyleSheet, Alert } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Modal, TextInput, StyleSheet, Alert, KeyboardAvoidingView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useWorkoutStore } from '../hooks/useWorkoutStore';
 import { PersonalRecord } from '../types/workout.types';
@@ -504,8 +504,8 @@ export default function WorkoutHistoryScreen() {
         {/* PR Edit Modal */}
         {editingPR && (
           <Modal visible transparent animationType="slide">
-            <SafeAreaView style={s.modalSafe} edges={['bottom']}>
-              <View style={s.modalOverlay}>
+            <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+            <View style={s.modalOverlay}>
                 <View style={s.modalCard}>
                   <View style={s.modalTopRow}>
                     <Text style={s.modalTitle}>{isNewPR ? 'Log New PR' : 'Edit PR'}</Text>
@@ -571,7 +571,7 @@ export default function WorkoutHistoryScreen() {
                   )}
                 </View>
               </View>
-            </SafeAreaView>
+            </KeyboardAvoidingView>
           </Modal>
         )}
 

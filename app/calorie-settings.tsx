@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
-  StyleSheet, ActivityIndicator, Animated,
+  StyleSheet, ActivityIndicator, Animated, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -104,7 +104,8 @@ export default function CalorieSettingsScreen() {
 
   return (
     <SafeAreaView style={s.safe} edges={['bottom']}>
-      <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+      <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
 
         {/* Targets card */}
         <View style={s.targetsCard}>
@@ -207,6 +208,7 @@ export default function CalorieSettingsScreen() {
         </TouchableOpacity>
 
       </ScrollView>
+      </KeyboardAvoidingView>
 
       <Animated.View
         pointerEvents="none"
