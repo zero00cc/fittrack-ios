@@ -30,6 +30,7 @@
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
+      "./plugins/fix-ios26-crash",
       "expo-router",
       [
         "expo-splash-screen",
